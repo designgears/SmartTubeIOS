@@ -55,18 +55,18 @@ struct TVSearchView: View {
             TVLoadingView(message: "Searching…").frame(height: 500)
         } else if let error = vm.error {
             TVMessageView(
-                systemImage: "exclamationmark.triangle",
+                systemImage: AppSymbol.warningOutline,
                 title: "Search failed",
                 message: error.localizedDescription,
                 actionTitle: "Try Again"
             ) { runSearch() }
             .frame(height: 500)
         } else if !vm.query.isEmpty, vm.query == text, !text.isEmpty, didSearch {
-            TVMessageView(systemImage: "magnifyingglass", title: "No results for “\(text)”")
+            TVMessageView(systemImage: AppSymbol.search, title: "No results for “\(text)”")
                 .frame(height: 500)
         } else {
             TVMessageView(
-                systemImage: "magnifyingglass",
+                systemImage: AppSymbol.search,
                 title: "Search YouTube",
                 message: "Find videos, channels and playlists."
             )
@@ -94,7 +94,7 @@ struct TVSearchView: View {
                     }
                 }
             } label: {
-                Label("Sort: \(vm.filter.sortOrder.label)", systemImage: "arrow.up.arrow.down")
+                Label("Sort: \(vm.filter.sortOrder.label)", systemImage: AppSymbol.sortOrder)
             }
             Menu {
                 ForEach(SearchFilter.UploadDate.allCases, id: \.self) { date in
@@ -105,7 +105,7 @@ struct TVSearchView: View {
                     }
                 }
             } label: {
-                Label(vm.filter.uploadDate.label, systemImage: "calendar")
+                Label(vm.filter.uploadDate.label, systemImage: AppSymbol.calendar)
             }
             Spacer()
         }

@@ -33,7 +33,7 @@ struct TVVideoThumbnail: View {
     let video: Video
     var showsBadges = true
     /// Watched fraction to draw as the red bar. Defaults to YouTube's own resume progress.
-    var progress: Double? = nil
+    var progress: Double?
     /// On-screen width, so the thumbnail is downsampled to the size actually shown.
     var pointWidth: CGFloat = TVLayout.cardWidth
 
@@ -149,12 +149,12 @@ struct TVVideoContextMenu: View {
     @Environment(\.innerTubeAPI) private var api
 
     var body: some View {
-        Button("Play", systemImage: "play.fill") { navigator.play(video) }
+        Button("Play", systemImage: AppSymbol.play) { navigator.play(video) }
         if let channelId = video.channelId, !channelId.isEmpty {
-            Button("Go to Channel", systemImage: "person.crop.square") { navigator.openChannel(of: video) }
+            Button("Go to Channel", systemImage: AppSymbol.personSquare) { navigator.openChannel(of: video) }
         }
         if auth.isSignedIn {
-            Button("Save to Watch Later", systemImage: "clock") {
+            Button("Save to Watch Later", systemImage: AppSymbol.clock) {
                 Task { _ = try? await api.addToWatchLater(videoId: video.id) }
             }
         }
@@ -193,14 +193,14 @@ struct TVShortCard: View {
 struct TVChannelCard: View {
     let title: String
     let thumbnailURL: URL?
-    var subtitle: String? = nil
+    var subtitle: String?
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             VStack(spacing: 18) {
                 ZStack {
-                    Image(systemName: "person.fill").font(.system(size: 64)).foregroundStyle(.secondary)
+                    Image(systemName: AppSymbol.person).font(.system(size: 64)).foregroundStyle(.secondary)
                     if let thumbnailURL {
                         TVRemoteImage(urls: [thumbnailURL], pointWidth: TVLayout.channelSize)
                     }
@@ -226,9 +226,9 @@ struct TVChannelCard: View {
 struct TVShelf<Item: Identifiable, Card: View>: View {
     let title: String
     let items: [Item]
-    var onReachEnd: (() -> Void)? = nil
+    var onReachEnd: (() -> Void)?
     /// Card width for warming the next thumbnails as the row scrolls (video rows only).
-    var prefetchWidth: CGFloat? = nil
+    var prefetchWidth: CGFloat?
     @ViewBuilder let card: (Item) -> Card
 
     var body: some View {
@@ -264,7 +264,7 @@ struct TVShelf<Item: Identifiable, Card: View>: View {
 /// Paging grid of video cards for full-page feeds.
 struct TVVideoGrid: View {
     let videos: [Video]
-    var onReachEnd: (() -> Void)? = nil
+    var onReachEnd: (() -> Void)?
     let onSelect: (Video) -> Void
 
     var body: some View {
@@ -289,7 +289,7 @@ struct TVVideoGrid: View {
 
 struct TVPageHeader: View {
     let title: String
-    var subtitle: String? = nil
+    var subtitle: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -307,11 +307,11 @@ struct TVPageHeader: View {
 struct TVMessageView: View {
     let systemImage: String
     let title: String
-    var message: String? = nil
-    var actionTitle: String? = nil
-    var action: (() -> Void)? = nil
-    var secondaryTitle: String? = nil
-    var secondaryAction: (() -> Void)? = nil
+    var message: String?
+    var actionTitle: String?
+    var action: (() -> Void)?
+    var secondaryTitle: String?
+    var secondaryAction: (() -> Void)?
 
     var body: some View {
         VStack(spacing: 28) {
@@ -358,7 +358,7 @@ struct TVFocusableIf: ViewModifier {
 }
 
 struct TVLoadingView: View {
-    var message: String? = nil
+    var message: String?
 
     var body: some View {
         VStack(spacing: 24) {
@@ -379,7 +379,7 @@ struct TVSignInPrompt: View {
 
     var body: some View {
         TVMessageView(
-            systemImage: "person.crop.circle.badge.questionmark",
+            systemImage: AppSymbol.personCircleQuestion,
             title: title,
             message: message,
             actionTitle: "Sign In"

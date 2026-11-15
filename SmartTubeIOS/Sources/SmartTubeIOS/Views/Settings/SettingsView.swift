@@ -174,11 +174,13 @@ public struct SettingsView: View {
     private var playerSection: some View {
         @Bindable var store = store
         return Section("Player") {
-            TVPickerRow("Default Playback Speed", value: Self.speedLabel(store.settings.playbackSpeed),
-                choices: tvChoices($store.settings.playbackSpeed, AppSettings.availableSpeeds) { Self.speedLabel($0) }) {
+            TVPickerRow(
+                "Default Playback Speed", value: Self.speedLabel(store.settings.playbackSpeed),
+                choices: tvChoices($store.settings.playbackSpeed, AppSettings.availableSpeeds) { Self.speedLabel($0) }
+            ) {
                 Picker("Default Playback Speed", selection: $store.settings.playbackSpeed) {
-                    ForEach(AppSettings.availableSpeeds, id: \.self) { s in
-                        Text(s == 1.0 ? "Normal" : "\(s, specifier: "%.2g")×").tag(s)
+                    ForEach(AppSettings.availableSpeeds, id: \.self) { speed in
+                        Text(speed == 1.0 ? "Normal" : "\(speed, specifier: "%.2g")×").tag(speed)
                     }
                 }
             }
@@ -191,11 +193,15 @@ public struct SettingsView: View {
             }
 
             #if !os(iOS)
-            TVPickerRow("Default Quality", value: store.settings.preferredQuality.rawValue.capitalized,
-                choices: tvChoices($store.settings.preferredQuality, AppSettings.VideoQuality.allCases) { $0.rawValue.capitalized }) {
+            TVPickerRow(
+                "Default Quality", value: store.settings.preferredQuality.rawValue.capitalized,
+                choices: tvChoices($store.settings.preferredQuality, AppSettings.VideoQuality.allCases) {
+                    $0.rawValue.capitalized
+                }
+            ) {
                 Picker("Default Quality", selection: $store.settings.preferredQuality) {
-                    ForEach(AppSettings.VideoQuality.allCases, id: \.self) { q in
-                        Text(q.rawValue.capitalized).tag(q)
+                    ForEach(AppSettings.VideoQuality.allCases, id: \.self) { quality in
+                        Text(quality.rawValue.capitalized).tag(quality)
                     }
                 }
                 .accessibilityIdentifier("settings.preferredQualityPicker")
@@ -264,8 +270,12 @@ public struct SettingsView: View {
             #endif
 
             #if !os(iOS)
-            TVPickerRow("Video Fit", value: store.settings.videoGravityMode == .fill ? "Fill (crop)" : "Fit (letterbox)",
-                choices: tvChoices($store.settings.videoGravityMode, [.fit, .fill]) { $0 == .fill ? "Fill (crop)" : "Fit (letterbox)" }) {
+            TVPickerRow(
+                "Video Fit", value: store.settings.videoGravityMode == .fill ? "Fill (crop)" : "Fit (letterbox)",
+                choices: tvChoices($store.settings.videoGravityMode, [.fit, .fill]) {
+                    $0 == .fill ? "Fill (crop)" : "Fit (letterbox)"
+                }
+            ) {
                 Picker("Video Fit", selection: $store.settings.videoGravityMode) {
                     Text("Fit (letterbox)").tag(AppSettings.VideoGravityMode.fit)
                     Text("Fill (crop)").tag(AppSettings.VideoGravityMode.fill)
@@ -290,8 +300,12 @@ public struct SettingsView: View {
     private var generalSection: some View {
         @Bindable var store = store
         return Section {
-            TVPickerRow("Watch History", value: store.settings.historyState == .enabled ? "Enabled" : "Disabled",
-                choices: tvChoices($store.settings.historyState, [.enabled, .disabled]) { $0 == .enabled ? "Enabled" : "Disabled" }) {
+            TVPickerRow(
+                "Watch History", value: store.settings.historyState == .enabled ? "Enabled" : "Disabled",
+                choices: tvChoices($store.settings.historyState, [.enabled, .disabled]) {
+                    $0 == .enabled ? "Enabled" : "Disabled"
+                }
+            ) {
                 Picker("Watch History", selection: $store.settings.historyState) {
                     Text("Enabled").tag(AppSettings.HistoryState.enabled)
                     Text("Disabled").tag(AppSettings.HistoryState.disabled)
@@ -337,17 +351,23 @@ public struct SettingsView: View {
     private var uiSection: some View {
         @Bindable var store = store
         return Section("Interface") {
-            TVPickerRow("Theme", value: store.settings.themeName.rawValue,
-                choices: tvChoices($store.settings.themeName, AppSettings.ThemeName.allCases) { $0.rawValue }) {
+            TVPickerRow(
+                "Theme", value: store.settings.themeName.rawValue,
+                choices: tvChoices($store.settings.themeName, AppSettings.ThemeName.allCases) { $0.rawValue }
+            ) {
                 Picker("Theme", selection: $store.settings.themeName) {
-                    ForEach(AppSettings.ThemeName.allCases, id: \.self) { t in
-                        Text(t.rawValue).tag(t)
+                    ForEach(AppSettings.ThemeName.allCases, id: \.self) { theme in
+                        Text(theme.rawValue).tag(theme)
                     }
                 }
                 .accessibilityIdentifier("settings.themeRow")
             }
-            TVPickerRow("Accent Color", value: store.settings.accentColor.displayName,
-                choices: tvChoices($store.settings.accentColor, AppSettings.AccentColorChoice.allCases) { $0.displayName }) {
+            TVPickerRow(
+                "Accent Color", value: store.settings.accentColor.displayName,
+                choices: tvChoices($store.settings.accentColor, AppSettings.AccentColorChoice.allCases) {
+                    $0.displayName
+                }
+            ) {
                 Picker("Accent Color", selection: $store.settings.accentColor) {
                     ForEach(AppSettings.AccentColorChoice.allCases, id: \.self) { choice in
                         #if os(tvOS)
@@ -410,8 +430,13 @@ public struct SettingsView: View {
             if store.settings.hideWatchedVideos {
                 #if os(tvOS)
                 // tvOS has no Stepper.
-                TVPickerRow("Watched threshold", value: "\(Int((store.settings.hideWatchedThreshold * 100).rounded()))%",
-                    choices: tvChoices($store.settings.hideWatchedThreshold, stride(from: 50, through: 100, by: 5).map { Double($0) / 100 }) { "\(Int(($0 * 100).rounded()))%" }) {
+                TVPickerRow(
+                    "Watched threshold", value: "\(Int((store.settings.hideWatchedThreshold * 100).rounded()))%",
+                    choices: tvChoices(
+                        $store.settings.hideWatchedThreshold,
+                        stride(from: 50, through: 100, by: 5).map { Double($0) / 100 }
+                    ) { "\(Int(($0 * 100).rounded()))%" }
+                ) {
                     Picker("Watched threshold", selection: $store.settings.hideWatchedThreshold) {
                         ForEach(Array(stride(from: 50, through: 100, by: 5)), id: \.self) { percent in
                             Text("\(percent)%").tag(Double(percent) / 100)
@@ -489,8 +514,13 @@ public struct SettingsView: View {
                 }
 
                 // Minimum segment duration
-                TVPickerRow("Min. Segment Length", value: Self.segmentLengthLabel(store.settings.sponsorBlockMinSegmentDuration),
-                    choices: tvChoices($store.settings.sponsorBlockMinSegmentDuration, [0, 1, 2, 5, 10]) { Self.segmentLengthLabel($0) }) {
+                TVPickerRow(
+                    "Min. Segment Length",
+                    value: Self.segmentLengthLabel(store.settings.sponsorBlockMinSegmentDuration),
+                    choices: tvChoices($store.settings.sponsorBlockMinSegmentDuration, [0, 1, 2, 5, 10]) {
+                        Self.segmentLengthLabel($0)
+                    }
+                ) {
                     Picker("Min. Segment Length", selection: $store.settings.sponsorBlockMinSegmentDuration) {
                         Text("Off").tag(0.0)
                         Text("1s").tag(1.0)
@@ -589,7 +619,9 @@ public struct SettingsView: View {
     // MARK: - Helpers
 
     /// Language codes offered by the Preferred Audio Language picker (nil = system default).
-    static let audioLanguageCodes: [String?] = [nil, "en", "es", "fr", "de", "ja", "ko", "pt-BR", "zh-Hans", "original"]
+    static let audioLanguageCodes: [String?] = [
+        nil, "en", "es", "fr", "de", "ja", "ko", "pt-BR", "zh-Hans", "original",
+    ]
 
     /// Builds the tvOS option list for a `TVPickerRow` from a binding and its values.
     func tvChoices<V: Equatable>(

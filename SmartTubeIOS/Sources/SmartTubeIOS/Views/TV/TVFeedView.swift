@@ -68,7 +68,7 @@ struct TVFeedView: View {
             TVSignInPrompt(title: "Sign in to see \(title)", message: signInMessage).frame(height: 700)
         } else if let error = vm?.error {
             TVMessageView(
-                systemImage: "exclamationmark.triangle",
+                systemImage: AppSymbol.warningOutline,
                 title: "Couldn't load \(title)",
                 message: error.localizedDescription,
                 actionTitle: "Try Again"
@@ -168,7 +168,8 @@ struct TVChannelsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                TVPageHeader(title: "Channels", subtitle: auth.isSignedIn ? nil : "Channels you follow on this Apple TV")
+                TVPageHeader(
+                    title: "Channels", subtitle: auth.isSignedIn ? nil : "Channels you follow on this Apple TV")
                 if let vm, !vm.subscribedChannels.isEmpty {
                     LazyVGrid(
                         columns: [GridItem(.adaptive(minimum: 250, maximum: 290), spacing: 40, alignment: .top)],
@@ -191,7 +192,7 @@ struct TVChannelsView: View {
                     TVLoadingView().frame(height: 700)
                 } else if auth.isSignedIn {
                     TVMessageView(
-                        systemImage: "person.2",
+                        systemImage: AppSymbol.accounts,
                         title: "No channels yet",
                         message: "Channels you subscribe to on YouTube appear here.",
                         actionTitle: "Refresh", action: { vm?.reload(section: section) }
@@ -199,7 +200,7 @@ struct TVChannelsView: View {
                     .frame(height: 700)
                 } else {
                     TVMessageView(
-                        systemImage: "person.2",
+                        systemImage: AppSymbol.accounts,
                         title: "No channels yet",
                         message: "Open a channel and choose Follow, or sign in to use your YouTube subscriptions.",
                         actionTitle: "Sign In", action: { showSignIn = true },

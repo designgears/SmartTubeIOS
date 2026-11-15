@@ -63,8 +63,8 @@ public actor TokenManager {
     /// All accounts signed in on this device (see `SavedAccount`) and which one is active,
     /// as stored at init time. Kept separately from the active-account keys so signing out
     /// of one account never touches the others.
-    public nonisolated let initialSavedAccounts: [SavedAccount]
-    public nonisolated let initialActiveAccountId: String?
+    nonisolated public let initialSavedAccounts: [SavedAccount]
+    nonisolated public let initialActiveAccountId: String?
 
     // MARK: - Init
 

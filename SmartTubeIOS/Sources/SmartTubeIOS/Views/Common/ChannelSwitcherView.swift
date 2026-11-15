@@ -26,7 +26,7 @@ struct ChannelSwitcherView: View {
                     ProgressView()
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         #if os(tvOS)
-                        .focusable()  // keep the Siri Remote from getting stuck while loading
+                    .focusable()  // keep the Siri Remote from getting stuck while loading
                         #endif
                 } else {
                     ContentUnavailableView {

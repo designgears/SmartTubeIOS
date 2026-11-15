@@ -60,12 +60,14 @@ public actor YouTubeJSSolver: StreamURLDeciphering {
         return contextSTS
     }
 
+    // `n` mirrors YouTube's query-parameter name (see StreamURLDeciphering).
+    // swiftlint:disable:next identifier_name
     public func solve(n: Set<String>, sig: Set<String>) async -> StreamChallengeSolutions {
         let ctx = await readyContext()
 
         var result = StreamChallengeSolutions()
-        for key in n { if let v = nCache[key] { result.n[key] = v } }
-        for key in sig { if let v = sigCache[key] { result.sig[key] = v } }
+        for key in n { if let solved = nCache[key] { result.n[key] = solved } }
+        for key in sig { if let solved = sigCache[key] { result.sig[key] = solved } }
         let missingN = n.subtracting(result.n.keys)
         let missingSig = sig.subtracting(result.sig.keys)
         guard let ctx, !missingN.isEmpty || !missingSig.isEmpty else { return result }
@@ -165,6 +167,7 @@ public actor YouTubeJSSolver: StreamURLDeciphering {
         return ctx
     }
 
+    // swiftlint:disable:next identifier_name
     private func run(_ ctx: JSContext, n: Set<String>, sig: Set<String>) -> StreamChallengeSolutions {
         var types: [String] = []
         var requests: [[String: Any]] = []
@@ -255,10 +258,10 @@ public actor YouTubeJSSolver: StreamURLDeciphering {
 
     private static func firstMatch(_ pattern: String, in text: String) -> String? {
         guard let regex = try? NSRegularExpression(pattern: pattern),
-            let m = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
-            let r = Range(m.range(at: 1), in: text)
+            let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+            let range = Range(match.range(at: 1), in: text)
         else { return nil }
-        return String(text[r])
+        return String(text[range])
     }
 
     private static func bundledScript(_ name: String) -> String? {

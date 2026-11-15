@@ -157,7 +157,9 @@ extension InnerTubeAPI {
         do {
             return try await requestPlayerInfoVisionOS(videoId: videoId)
         } catch {
-            tubeLog.notice("VisionOS request failed on a reused session — reseeding: \(error.localizedDescription, privacy: .public)")
+            tubeLog.notice(
+                "VisionOS request failed on a reused session — reseeding: \(error.localizedDescription, privacy: .public)"
+            )
             await seedVisionOSSession(videoId: videoId)
             return try await requestPlayerInfoVisionOS(videoId: videoId)
         }

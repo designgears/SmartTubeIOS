@@ -1,5 +1,9 @@
 import Foundation
 
+// `n`, `s` and `sp` are YouTube's own query-parameter names; keeping them makes the mapping
+// to stream URLs obvious.
+// swiftlint:disable identifier_name
+
 // MARK: - StreamURLDeciphering
 
 /// Solves YouTube player-JS challenges for stream URLs:
@@ -65,11 +69,11 @@ public enum StreamURLRewriter {
     ///   need the n transform; applying it to Android/iOS/VR URLs breaks them.
     public static func challenges(in formats: [[String: Any]], includeN: Bool) -> Challenges {
         var result = Challenges()
-        for f in formats {
+        for format in formats {
             let base: String?
-            if let url = f["url"] as? String {
+            if let url = format["url"] as? String {
                 base = url
-            } else if let cipher = cipher(of: f) {
+            } else if let cipher = cipher(of: format) {
                 base = cipher.url
                 result.sig.insert(cipher.s)
             } else {
@@ -103,14 +107,15 @@ public enum StreamURLRewriter {
 
     // MARK: HLS playlists
 
-    private static let hlsNPattern = try! NSRegularExpression(pattern: #"/n/([^/\s"]+)/"#)
+    // swiftlint:disable:next force_try
+    private static let hlsNPattern = try! NSRegularExpression(pattern: #"/n/([^/\s"]+)/"#)  // constant, valid pattern
 
     /// Distinct `/n/VALUE/` path values in an HLS playlist (master or variant).
     public static func hlsNChallenges(in playlist: String) -> Set<String> {
         let range = NSRange(playlist.startIndex..., in: playlist)
         return Set(
-            hlsNPattern.matches(in: playlist, range: range).compactMap { m in
-                Range(m.range(at: 1), in: playlist).map { String(playlist[$0]) }
+            hlsNPattern.matches(in: playlist, range: range).compactMap { match in
+                Range(match.range(at: 1), in: playlist).map { String(playlist[$0]) }
             })
     }
 
@@ -149,8 +154,8 @@ public enum StreamURLRewriter {
         guard var comps = URLComponents(string: urlString), var items = comps.percentEncodedQueryItems else {
             return urlString
         }
-        for i in items.indices where items[i].name == name {
-            items[i].value = encode(value)
+        for index in items.indices where items[index].name == name {
+            items[index].value = encode(value)
         }
         comps.percentEncodedQueryItems = items
         return comps.string ?? urlString
@@ -166,3 +171,5 @@ public enum StreamURLRewriter {
         value.addingPercentEncoding(withAllowedCharacters: valueAllowed) ?? value
     }
 }
+
+// swiftlint:enable identifier_name

@@ -40,7 +40,7 @@ struct TVChannelView: View {
                         TVLoadingView().frame(height: 500)
                     } else if let error = vm.error {
                         TVMessageView(
-                            systemImage: "exclamationmark.triangle",
+                            systemImage: AppSymbol.warningOutline,
                             title: "Couldn't load this channel",
                             message: error.localizedDescription,
                             actionTitle: "Try Again"
@@ -48,7 +48,7 @@ struct TVChannelView: View {
                         .frame(height: 500)
                     } else if vm.shorts.isEmpty {
                         TVMessageView(
-                            systemImage: "play.rectangle",
+                            systemImage: AppSymbol.playRectangle,
                             title: "No videos",
                             message: "This channel hasn't posted any videos yet.",
                             actionTitle: "Go Back"
@@ -77,7 +77,7 @@ struct TVChannelView: View {
                 } else {
                     ZStack {
                         Color.white.opacity(0.08)
-                        Image(systemName: "person.fill").font(.system(size: 80)).foregroundStyle(.secondary)
+                        Image(systemName: AppSymbol.person).font(.system(size: 80)).foregroundStyle(.secondary)
                     }
                 }
             }
@@ -119,7 +119,8 @@ struct TVChannelView: View {
     private func toggleFollow() {
         let newValue = !isFollowing
         isFollowing = newValue
-        let local = LocalChannel(id: channelId, title: vm?.channel?.title ?? title, thumbnailURL: vm?.channel?.thumbnailURL)
+        let local = LocalChannel(
+            id: channelId, title: vm?.channel?.title ?? title, thumbnailURL: vm?.channel?.thumbnailURL)
         Task {
             if newValue {
                 await LocalSubscriptionStore.shared.follow(local)
@@ -158,7 +159,7 @@ struct TVPlaylistView: View {
                         TVLoadingView().frame(height: 600)
                     } else if let error = vm.error {
                         TVMessageView(
-                            systemImage: "exclamationmark.triangle",
+                            systemImage: AppSymbol.warningOutline,
                             title: "Couldn't load this playlist",
                             message: error.localizedDescription,
                             actionTitle: "Try Again"
@@ -166,7 +167,7 @@ struct TVPlaylistView: View {
                         .frame(height: 600)
                     } else {
                         TVMessageView(
-                            systemImage: isQueue ? "text.line.first.and.arrowtriangle.forward" : "list.bullet.rectangle",
+                            systemImage: isQueue ? AppSymbol.upNext : AppSymbol.playlist,
                             title: isQueue ? "Your queue is empty" : "This playlist is empty",
                             message: isQueue ? "Play a playlist to fill the queue." : nil,
                             actionTitle: "Browse Home", action: { navigator.selection = .home }
@@ -201,13 +202,13 @@ struct TVPlaylistView: View {
                     Button {
                         navigator.play(first, queue: videos)
                     } label: {
-                        Label("Play All", systemImage: "play.fill")
+                        Label("Play All", systemImage: AppSymbol.play)
                     }
                     Button {
                         let shuffled = videos.shuffled()
                         if let start = shuffled.first { navigator.play(start, queue: shuffled) }
                     } label: {
-                        Label("Shuffle", systemImage: "shuffle")
+                        Label("Shuffle", systemImage: AppSymbol.shuffle)
                     }
                 }
                 .padding(.horizontal, TVLayout.pageInset)

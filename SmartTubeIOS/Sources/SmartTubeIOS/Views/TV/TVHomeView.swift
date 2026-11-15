@@ -37,7 +37,7 @@ struct TVHomeView: View {
                 } else {
                     // Feed failed or came back empty: always leave something focusable.
                     TVMessageView(
-                        systemImage: "wifi.exclamationmark",
+                        systemImage: AppSymbol.offline,
                         title: "Couldn't load your feed",
                         message: "Check your connection, then try again.",
                         actionTitle: "Try Again"
@@ -51,19 +51,26 @@ struct TVHomeView: View {
                 }
 
                 if !continueWatching.isEmpty {
-                    TVShelf(title: "Continue Watching", items: continueWatching, prefetchWidth: TVLayout.cardWidth) { video in
+                    TVShelf(
+                        title: "Continue Watching", items: continueWatching, prefetchWidth: TVLayout.cardWidth
+                    ) { video in
                         TVVideoCard(video: video) { navigator.play(video) }
                     }
                 }
 
                 if !recommended.isEmpty {
-                    TVShelf(title: "Recommended", items: recommended, onReachEnd: loadMoreRecommended, prefetchWidth: TVLayout.cardWidth) { video in
+                    TVShelf(
+                        title: "Recommended", items: recommended, onReachEnd: loadMoreRecommended,
+                        prefetchWidth: TVLayout.cardWidth
+                    ) { video in
                         TVVideoCard(video: video) { navigator.play(video) }
                     }
                 }
 
                 if !subscriptionVideos.isEmpty {
-                    TVShelf(title: "From Your Subscriptions", items: subscriptionVideos, prefetchWidth: TVLayout.cardWidth) { video in
+                    TVShelf(
+                        title: "From Your Subscriptions", items: subscriptionVideos, prefetchWidth: TVLayout.cardWidth
+                    ) { video in
                         TVVideoCard(video: video) { navigator.play(video) }
                     }
                 }
@@ -206,7 +213,7 @@ struct TVHomeView: View {
 
 struct TVHeroView: View {
     let video: Video
-    var focusNamespace: Namespace.ID? = nil
+    var focusNamespace: Namespace.ID?
     @Environment(TVNavigator.self) private var navigator
 
     var body: some View {
@@ -244,14 +251,14 @@ struct TVHeroView: View {
                     Button {
                         navigator.play(video)
                     } label: {
-                        Label("Play", systemImage: "play.fill").padding(.horizontal, 24)
+                        Label("Play", systemImage: AppSymbol.play).padding(.horizontal, 24)
                     }
                     .modifier(TVDefaultFocus(namespace: focusNamespace))
                     if video.channelId != nil {
                         Button {
                             navigator.openChannel(of: video)
                         } label: {
-                            Label("Channel", systemImage: "person.crop.square")
+                            Label("Channel", systemImage: AppSymbol.personSquare)
                         }
                     }
                 }
@@ -301,10 +308,9 @@ struct TVSectionShelf: View {
                     onReachEnd: {
                         if let vm, let last = vm.videoGroups.last?.videos.last { vm.loadMoreIfNeeded(lastVideo: last) }
                     },
-                    prefetchWidth: TVLayout.cardWidth
-                ) { video in
-                    TVVideoCard(video: video) { navigator.play(video) }
-                }
+                    prefetchWidth: TVLayout.cardWidth,
+                    card: { video in TVVideoCard(video: video) { navigator.play(video) } }
+                )
             }
         }
         .onAppear {

@@ -20,7 +20,7 @@ public struct DiagnosticsLogger: Sendable {
 
     /// #92: set once from the app entry point's init(), before any logging, from
     /// `AppSettings.disableAnalytics`. When `false`, nothing is written to disk.
-    public nonisolated(unsafe) static var isEnabled = true
+    nonisolated(unsafe) public static var isEnabled = true
 
     /// Short identifier (8 hex chars) generated once per app session. Shown in the Stats for
     /// Nerds overlay and stamped into every report so the two can be matched up.
@@ -207,7 +207,8 @@ final class DiagnosticsStore: @unchecked Sendable {
         NSSetUncaughtExceptionHandler { exception in
             DiagnosticsStore.shared.recordUncaughtException(exception)
         }
-        log.notice("diagnostics session \(reportID, privacy: .public) → \(self.directory?.path ?? "nil", privacy: .public)")
+        log.notice(
+            "diagnostics session \(reportID, privacy: .public) → \(self.directory?.path ?? "nil", privacy: .public)")
     }
 
     func breadcrumb(_ line: String) {

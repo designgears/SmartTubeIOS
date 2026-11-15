@@ -5,7 +5,7 @@ import SwiftUI
 import UIKit
 import os
 
-private let tvPlayerLog = Logger(subsystem: "com.void.smarttube.app", category: "TVPlayer")
+private let tvPlayerLog = Logger(subsystem: appSubsystem, category: "TVPlayer")
 
 // MARK: - TVPlayerScreen
 
@@ -30,8 +30,9 @@ struct TVPlayerScreen: View {
                 TVNativePlayer(
                     vm: vm, state: menuState(vm), actions: actions(vm), fallbackVideo: video,
                     fillsScreen: store.settings.videoGravityMode == .fill,
-                    transportBar: transportBar)
-                    .ignoresSafeArea()
+                    transportBar: transportBar
+                )
+                .ignoresSafeArea()
                 TVSponsorSegmentsTrack(
                     segments: vm.sponsorSegments, duration: vm.duration, isVisible: transportBar.isVisible)
                 TVPlayerOverlays(vm: vm, video: video) { navigator.nowPlaying = nil }
@@ -211,7 +212,9 @@ struct TVNativePlayer: UIViewControllerRepresentable {
         /// reports hiding (see `remoteInteraction`).
         private static let transportBarSafetyTimeout: Duration = .seconds(8)
 
-        func attach(_ pvc: AVPlayerViewController, vm: PlaybackViewModel, fallbackVideo: Video, actions: TVPlayerActions) {
+        func attach(
+            _ pvc: AVPlayerViewController, vm: PlaybackViewModel, fallbackVideo: Video, actions: TVPlayerActions
+        ) {
             self.pvc = pvc
             self.vm = vm
             self.fallbackVideo = fallbackVideo
@@ -288,7 +291,7 @@ struct TVNativePlayer: UIViewControllerRepresentable {
             pvc.transportBarCustomMenuItems = menus(for: state)
             if let label = state.skipLabel {
                 pvc.contextualActions = [
-                    UIAction(title: label, image: UIImage(systemName: "forward.end.fill")) { [weak self] _ in
+                    UIAction(title: label, image: UIImage(systemName: AppSymbol.nextTrack)) { [weak self] _ in
                         self?.actions?.skipSegment()
                     }
                 ]
@@ -329,7 +332,7 @@ struct TVNativePlayer: UIViewControllerRepresentable {
             items.append(
                 UIAction(
                     title: state.isLiked ? "Liked" : "Like",
-                    image: UIImage(systemName: state.isLiked ? "hand.thumbsup.fill" : "hand.thumbsup")
+                    image: UIImage(systemName: state.isLiked ? AppSymbol.thumbsUpFill : AppSymbol.thumbsUp)
                 ) { [weak self] _ in self?.actions?.like() })
 
             var qualityChildren: [UIMenuElement] = [
@@ -350,7 +353,7 @@ struct TVNativePlayer: UIViewControllerRepresentable {
             }
             items.append(
                 UIMenu(
-                    title: "Quality", image: UIImage(systemName: "sparkles.tv"),
+                    title: "Quality", image: UIImage(systemName: AppSymbol.quality),
                     options: .singleSelection, children: qualityChildren))
 
             if !state.captions.isEmpty {
@@ -360,31 +363,31 @@ struct TVNativePlayer: UIViewControllerRepresentable {
                     }
                 ]
                 children += state.captions.map { option in
-                    UIAction(title: option.name, state: option.id == state.selectedCaptionID ? .on : .off) {
-                        [weak self] _ in self?.actions?.selectCaption(option.id)
-                    }
+                    UIAction(
+                        title: option.name, state: option.id == state.selectedCaptionID ? .on : .off,
+                        handler: { [weak self] _ in self?.actions?.selectCaption(option.id) })
                 }
                 items.append(
                     UIMenu(
-                        title: "Subtitles", image: UIImage(systemName: "captions.bubble"),
+                        title: "Subtitles", image: UIImage(systemName: AppSymbol.subtitles),
                         options: .singleSelection, children: children))
             }
 
             let speeds: [Double] = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
             items.append(
                 UIMenu(
-                    title: "Speed", image: UIImage(systemName: "gauge.with.dots.needle.67percent"),
+                    title: "Speed", image: UIImage(systemName: AppSymbol.speed),
                     options: .singleSelection,
                     children: speeds.map { speed in
-                        UIAction(title: Self.speedLabel(speed), state: abs(speed - state.speed) < 0.01 ? .on : .off) {
-                            [weak self] _ in self?.actions?.setSpeed(speed)
-                        }
+                        UIAction(
+                            title: Self.speedLabel(speed), state: abs(speed - state.speed) < 0.01 ? .on : .off,
+                            handler: { [weak self] _ in self?.actions?.setSpeed(speed) })
                     }))
 
             if !state.chapters.isEmpty {
                 items.append(
                     UIMenu(
-                        title: "Chapters", image: UIImage(systemName: "list.number"),
+                        title: "Chapters", image: UIImage(systemName: AppSymbol.chapters),
                         children: state.chapters.map { chapter in
                             let action = UIAction(title: chapter.title) { [weak self] _ in
                                 self?.actions?.seek(chapter.start)
@@ -397,28 +400,28 @@ struct TVNativePlayer: UIViewControllerRepresentable {
             var more: [UIMenuElement] = [
                 UIAction(
                     title: state.isDisliked ? "Disliked" : "Dislike",
-                    image: UIImage(systemName: state.isDisliked ? "hand.thumbsdown.fill" : "hand.thumbsdown")
+                    image: UIImage(systemName: state.isDisliked ? AppSymbol.thumbsDownFill : AppSymbol.thumbsDown)
                 ) { [weak self] _ in self?.actions?.dislike() }
             ]
             if state.hasPrevious {
                 more.append(
-                    UIAction(title: "Previous Video", image: UIImage(systemName: "backward.end.fill")) {
-                        [weak self] _ in self?.actions?.previous()
-                    })
+                    UIAction(
+                        title: "Previous Video", image: UIImage(systemName: AppSymbol.previousTrack),
+                        handler: { [weak self] _ in self?.actions?.previous() }))
             }
             if state.hasNext {
                 more.append(
-                    UIAction(title: "Next Video", image: UIImage(systemName: "forward.end.fill")) {
-                        [weak self] _ in self?.actions?.next()
-                    })
+                    UIAction(
+                        title: "Next Video", image: UIImage(systemName: AppSymbol.nextTrack),
+                        handler: { [weak self] _ in self?.actions?.next() }))
             }
             if state.hasChannel {
                 more.append(
-                    UIAction(title: "Go to Channel", image: UIImage(systemName: "person.crop.square")) {
-                        [weak self] _ in self?.actions?.openChannel()
-                    })
+                    UIAction(
+                        title: "Go to Channel", image: UIImage(systemName: AppSymbol.personSquare),
+                        handler: { [weak self] _ in self?.actions?.openChannel() }))
             }
-            items.append(UIMenu(title: "More", image: UIImage(systemName: "ellipsis.circle"), children: more))
+            items.append(UIMenu(title: "More", image: UIImage(systemName: AppSymbol.more), children: more))
             return items
         }
 
@@ -466,8 +469,9 @@ struct TVNativePlayer: UIViewControllerRepresentable {
 
         static func timeLabel(_ seconds: TimeInterval) -> String {
             let total = Int(seconds)
-            let (h, m, s) = (total / 3600, (total % 3600) / 60, total % 60)
-            return h > 0 ? String(format: "%d:%02d:%02d", h, m, s) : String(format: "%d:%02d", m, s)
+            let (hours, minutes, seconds) = (total / 3600, (total % 3600) / 60, total % 60)
+            return hours > 0
+                ? String(format: "%d:%02d:%02d", hours, minutes, seconds) : String(format: "%d:%02d", minutes, seconds)
         }
     }
 }
@@ -506,9 +510,9 @@ struct TVPlayerOverlays: View {
         return ZStack {
             // Blurred, so a small decode is indistinguishable and far cheaper.
             TVRemoteImage(urls: current.highResThumbnailFallbackURLs, pointWidth: 480)
-            .blur(radius: 30)
-            .overlay(Color.black.opacity(0.55))
-            .ignoresSafeArea()
+                .blur(radius: 30)
+                .overlay(Color.black.opacity(0.55))
+                .ignoresSafeArea()
             VStack(spacing: 28) {
                 Text(current.title)
                     .font(.title2.weight(.bold))
@@ -535,7 +539,7 @@ struct TVPlayerErrorPanel: View {
         ZStack {
             Rectangle().fill(.ultraThinMaterial).ignoresSafeArea()
             VStack(spacing: 32) {
-                Image(systemName: "exclamationmark.triangle.fill")
+                Image(systemName: AppSymbol.warning)
                     .font(.system(size: 100))
                     .foregroundStyle(.yellow)
                 Text("Can't play this video").font(.title.weight(.bold))

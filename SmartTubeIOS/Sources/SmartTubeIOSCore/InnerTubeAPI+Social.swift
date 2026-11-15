@@ -285,7 +285,7 @@ extension InnerTubeAPI {
                     // WEB /next (2025+) lists related videos as lockupViewModel, the
                     // same model as the WEB home feed.
                     rendererKeysFound.insert("lockupViewModel")
-                    if let v = parseLockupViewModel(lockup) { videos.append(v) }
+                    if let video = parseLockupViewModel(lockup) { videos.append(video) }
                 } else {
                     for value in dict.values { walk(value, depth: depth + 1) }
                 }

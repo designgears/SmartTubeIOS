@@ -147,16 +147,16 @@ struct TVRemoteImage: View {
                 }
             }
             .clipped()
-        .task(id: urls.first) {
-            guard image == nil else { return }
-            let maxPixel = TVImagePipeline.pixels(for: pointWidth)
-            for url in urls {
-                if let loaded = await TVImagePipeline.image(url, maxPixel: maxPixel) {
-                    withAnimation(.easeOut(duration: 0.18)) { image = loaded }
-                    return
+            .task(id: urls.first) {
+                guard image == nil else { return }
+                let maxPixel = TVImagePipeline.pixels(for: pointWidth)
+                for url in urls {
+                    if let loaded = await TVImagePipeline.image(url, maxPixel: maxPixel) {
+                        withAnimation(.easeOut(duration: 0.18)) { image = loaded }
+                        return
+                    }
                 }
             }
-        }
     }
 }
 #endif

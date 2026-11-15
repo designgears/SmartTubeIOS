@@ -18,7 +18,7 @@ struct TVSettingsView: View {
                         if case .success(let image) = phase {
                             image.resizable().scaledToFill()
                         } else {
-                            Image(systemName: "person.crop.circle.fill")
+                            Image(systemName: AppSymbol.channel)
                                 .resizable().scaledToFit().foregroundStyle(.secondary)
                         }
                     }
@@ -27,7 +27,7 @@ struct TVSettingsView: View {
                     Text(auth.accountName ?? "YouTube Account")
                         .font(.title2.weight(.bold))
                 } else {
-                    Image(systemName: "gearshape.fill")
+                    Image(systemName: AppSymbol.settings)
                         .font(.system(size: 280, weight: .light))
                         .foregroundStyle(.secondary)
                     Text("SmartTube").font(.title2.weight(.bold))
