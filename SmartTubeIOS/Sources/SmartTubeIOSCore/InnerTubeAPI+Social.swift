@@ -281,6 +281,11 @@ extension InnerTubeAPI {
                     let v = parseVideoRenderer(r)
                 {
                     videos.append(v)
+                } else if let lockup = dict["lockupViewModel"] as? [String: Any] {
+                    // WEB /next (2025+) lists related videos as lockupViewModel, the
+                    // same model as the WEB home feed.
+                    rendererKeysFound.insert("lockupViewModel")
+                    if let v = parseLockupViewModel(lockup) { videos.append(v) }
                 } else {
                     for value in dict.values { walk(value, depth: depth + 1) }
                 }
@@ -292,7 +297,8 @@ extension InnerTubeAPI {
         tubeLog.notice(
             "[parseRelatedVideos] found=\(videos.count, privacy: .public) rendererKeys=\(rendererKeysFound.sorted().joined(separator: ","), privacy: .public)"
         )
-        return Array(videos.prefix(25))
+        var seen = Set<String>()
+        return Array(videos.filter { seen.insert($0.id).inserted }.prefix(25))
     }
 
     /// Parses video chapters from a `/next` response.

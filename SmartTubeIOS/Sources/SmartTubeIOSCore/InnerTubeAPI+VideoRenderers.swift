@@ -757,7 +757,7 @@ extension InnerTubeAPI {
 
     // MARK: – WEB lockupViewModel parser (Android LockupItem methodology)
     // Mirrors: LockupItem.getVideoId(), getTitle(), getThumbnails() in CommonHelper.kt
-    private func parseLockupViewModel(_ lockup: [String: Any]) -> Video? {
+    func parseLockupViewModel(_ lockup: [String: Any]) -> Video? {
         // videoId: rendererContext.commandContext.onTap.innertubeCommand.{watchEndpoint|reelWatchEndpoint}.videoId
         // Shorts use reelWatchEndpoint; regular videos use watchEndpoint.
         guard let rendererContext = lockup["rendererContext"] as? [String: Any],
