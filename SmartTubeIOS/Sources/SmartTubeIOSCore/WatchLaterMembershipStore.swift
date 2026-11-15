@@ -40,6 +40,16 @@ public final class WatchLaterMembershipStore {
 
     private let defaults: UserDefaults
 
+    /// Account switch (see `AccountScope`): park the live membership, load the incoming account's.
+    public func switchAccountData(from outgoing: String?, to incoming: String) {
+        let saved = AccountScope.exchange(
+            key: Self.defaultsKey, current: Array(videoIds), outgoing: outgoing, incoming: incoming, defaults: defaults)
+        videoIds = Set(saved as? [String] ?? [])
+        savedAt = [:]
+        savedVideos = [:]
+        defaults.set(Array(videoIds), forKey: Self.defaultsKey)
+    }
+
     public func contains(_ videoId: String) -> Bool {
         videoIds.contains(videoId)
     }
@@ -58,14 +68,14 @@ public final class WatchLaterMembershipStore {
         savedVideos[video.id] = saved
         markSaved(video.id, at: date)
         NotificationCenter.default.post(
-            name: .watchLaterDidChange, object: nil, userInfo: ["videoId": video.id, "added": true])
+            name: .watchLaterDidChange, object: self, userInfo: ["videoId": video.id, "added": true])
     }
 
     public func markRemoved(_ videoId: String) {
         savedAt[videoId] = nil
         savedVideos[videoId] = nil
         NotificationCenter.default.post(
-            name: .watchLaterDidChange, object: nil, userInfo: ["videoId": videoId, "added": false])
+            name: .watchLaterDidChange, object: self, userInfo: ["videoId": videoId, "added": false])
         guard videoIds.remove(videoId) != nil else { return }
         persist()
     }

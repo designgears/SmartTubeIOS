@@ -37,10 +37,25 @@ protocol UserDefaultsBackedStore: Actor {
     /// Conformers may override this to push the new value to iCloud sync.
     /// Default implementation is a no-op.
     func afterPersist()
+
+    /// The value used when the store has nothing saved (e.g. a new account).
+    static var emptyValue: Value { get }
 }
 
 extension UserDefaultsBackedStore {
     func afterPersist() {}
+
+    /// Account switch (see `AccountScope`): parks the live value under the outgoing account
+    /// and makes the incoming account's value live — one step inside the actor, so no
+    /// persist() can interleave and write the old account's data over the new one.
+    func switchAccountData(from outgoing: String?, to incoming: String) {
+        let current = try? JSONEncoder().encode(encodedValue())
+        let saved = AccountScope.exchange(
+            key: Self.defaultsKey, current: current, outgoing: outgoing, incoming: incoming, defaults: defaults)
+        let next = (saved as? Data).flatMap { try? JSONDecoder().decode(Value.self, from: $0) } ?? Self.emptyValue
+        decodeValue(next)
+        if let data = try? JSONEncoder().encode(next) { defaults.set(data, forKey: Self.defaultsKey) }
+    }
 
     /// Decodes the stored value from `defaults`. Nonisolated — safe to call
     /// from actor `init` before isolation is established.

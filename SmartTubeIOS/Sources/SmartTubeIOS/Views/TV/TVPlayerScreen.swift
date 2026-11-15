@@ -39,6 +39,12 @@ struct TVPlayerScreen: View {
         }
         .onAppear(perform: start)
         .onDisappear { vm?.stop() }
+        // Account switch: stop now, while the previous account is live, so its progress
+        // and watch time are saved to it; then close.
+        .onReceive(NotificationCenter.default.publisher(for: AccountScope.willChangeNotification)) { _ in
+            vm?.stop()
+            navigator.nowPlaying = nil
+        }
         // `videoEnded` is only set when nothing plays next (autoplay off, or the queue and
         // suggestions are exhausted) — return to the menus instead of sitting on the last frame.
         .onChange(of: vm?.videoEnded ?? false) { _, ended in

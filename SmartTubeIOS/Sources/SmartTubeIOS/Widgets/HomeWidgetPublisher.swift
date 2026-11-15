@@ -20,6 +20,10 @@ public enum HomeWidgetPublisher {
         browseViewModel.onHomeLoaded = { videos in publish(videos) }
     }
 
+    /// Shows the widget's empty state (e.g. the account changed; the new account's Home
+    /// load publishes its own feed).
+    public static func clear() { publish([]) }
+
     static func publish(_ videos: [Video]) {
         guard let store = HomeWidgetStore.shared else {
             widgetLog.error("App Group container unavailable — widget snapshot not written")

@@ -24,11 +24,10 @@ public struct SavedAccount: Codable, Sendable, Identifiable, Equatable {
     }
 
     /// True when `other` is the same Google account (re-added), not just the same entry.
+    /// Only the verified Google account id (`sub`) counts. Display names are never used:
+    /// different accounts can share a name, and a wrong match deletes an account.
     public func isSameGoogleAccount(as other: SavedAccount) -> Bool {
-        if let a = gaiaId, let b = other.gaiaId { return a == b }
-        if let a = primaryName, let b = other.primaryName, !a.isEmpty {
-            return a.caseInsensitiveCompare(b) == .orderedSame
-        }
-        return false
+        guard let mine = gaiaId, let theirs = other.gaiaId else { return false }
+        return mine == theirs
     }
 }

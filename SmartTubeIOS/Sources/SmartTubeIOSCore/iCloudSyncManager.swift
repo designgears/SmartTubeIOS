@@ -16,7 +16,7 @@ private let syncLog = Logger(subsystem: appSubsystem, category: "iCloudSync")
 
 // MARK: - SyncableStore keys
 
-public enum SyncableStore: String, Sendable {
+public enum SyncableStore: String, Sendable, CaseIterable {
     case subscriptions = "smarttube_subscriptions"
     case rssFeeds = "smarttube_rss_feeds"
     case videoState = "smarttube_video_state"
@@ -84,7 +84,7 @@ public actor iCloudSyncManager {
         guard syncEnabled else { return }
         do {
             let data = try JSONEncoder().encode(value)
-            kvStore.set(data, forKey: store.rawValue)
+            kvStore.set(data, forKey: Self.key(for: store))
         } catch {
             syncLog.error(
                 "[\(store.rawValue, privacy: .public)] push failed: \(error.localizedDescription, privacy: .public)")
@@ -96,11 +96,17 @@ public actor iCloudSyncManager {
     /// Reads and JSON-decodes a value from the iCloud KV store.
     /// Returns `nil` when the key is absent or decoding fails.
     public func pull<T: Codable & Sendable>(_ store: SyncableStore, as type: T.Type) -> T? {
-        guard let data = kvStore.data(forKey: store.rawValue) else { return nil }
+        guard let data = kvStore.data(forKey: Self.key(for: store)) else { return nil }
         return try? JSONDecoder().decode(type, from: data)
     }
 
     // MARK: - Private
+
+    /// Per account (AccountScope slot): these stores hold one account's data, so accounts
+    /// must not overwrite each other's iCloud copy.
+    static func key(for store: SyncableStore) -> String {
+        AccountScope.currentSlot.map { "\(store.rawValue).\($0)" } ?? store.rawValue
+    }
 
     private func startSync() {
         kvStore.synchronize()
@@ -132,7 +138,7 @@ public actor iCloudSyncManager {
 
     private func handleExternalChange(_ changedKeys: [String]) {
         for key in changedKeys {
-            if let store = SyncableStore(rawValue: key) {
+            if let store = SyncableStore.allCases.first(where: { key == Self.key(for: $0) }) {
                 externalChangesContinuation.yield(store)
             }
         }

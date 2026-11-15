@@ -9,6 +9,9 @@ import UIKit
 /// Owns the `TVNavigator` and presents the full-screen native player.
 struct TVRootView: View {
     @State private var navigator = TVNavigator()
+    /// Bumped when the active account changes; rebuilds every tab so pages reload the
+    /// new account's feeds and on-device data (progress bars, history, queue…).
+    @State private var accountGeneration = 0
 
     var body: some View {
         @Bindable var navigator = navigator
@@ -19,6 +22,7 @@ struct TVRootView: View {
                 TVLegacyTabs()
             }
         }
+        .id(accountGeneration)
         .environment(navigator)
         .fullScreenCover(item: $navigator.nowPlaying) { request in
             TVPlayerScreen(video: request.video)
@@ -26,6 +30,10 @@ struct TVRootView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .activeChannelDidChange)) { _ in
             navigator.selection = .home
+        }
+        .onReceive(NotificationCenter.default.publisher(for: AccountScope.didChangeNotification)) { _ in
+            navigator.resetForAccountChange()
+            accountGeneration += 1
         }
         .onAppear {
             TVImagePipeline.screenScale = UIScreen.main.scale
@@ -52,62 +60,62 @@ private struct TVSidebarTabs: View {
     var body: some View {
         @Bindable var navigator = navigator
         TabView(selection: $navigator.selection) {
-            Tab("Home", systemImage: "house.fill", value: TVTab.home) {
+            Tab("Home", systemImage: AppSymbol.home, value: TVTab.home) {
                 TVTabStack(tab: .home) { TVHomeView() }
             }
-            Tab("Subscriptions", systemImage: "play.square.stack.fill", value: TVTab.subscriptions) {
+            Tab("Subscriptions", systemImage: AppSymbol.subscriptions, value: TVTab.subscriptions) {
                 TVTabStack(tab: .subscriptions) { TVFeedView(type: .subscriptions) }
             }
             Tab(value: TVTab.search, role: .search) {
                 TVTabStack(tab: .search) { TVSearchView() }
             }
             Tab(
-                auth.isSignedIn ? (auth.accountName ?? "Accounts") : "Sign In",
-                systemImage: "person.crop.circle.fill",
+                auth.isSignedIn ? (auth.accountName ?? "Accounts") : (auth.savedAccounts.isEmpty ? "Sign In" : "Guest"),
+                systemImage: AppSymbol.channel,
                 value: TVTab.accounts
             ) {
                 TVTabStack(tab: .accounts) { TVAccountsView() }
             }
 
             TabSection("Explore") {
-                Tab("Music", systemImage: "music.note", value: TVTab.explore(.music)) {
+                Tab("Music", systemImage: AppSymbol.music, value: TVTab.explore(.music)) {
                     TVTabStack(tab: .explore(.music)) { TVFeedView(type: .music) }
                 }
-                Tab("Gaming", systemImage: "gamecontroller.fill", value: TVTab.explore(.gaming)) {
+                Tab("Gaming", systemImage: AppSymbol.gaming, value: TVTab.explore(.gaming)) {
                     TVTabStack(tab: .explore(.gaming)) { TVFeedView(type: .gaming) }
                 }
-                Tab("News", systemImage: "newspaper.fill", value: TVTab.explore(.news)) {
+                Tab("News", systemImage: AppSymbol.news, value: TVTab.explore(.news)) {
                     TVTabStack(tab: .explore(.news)) { TVFeedView(type: .news) }
                 }
-                Tab("Live", systemImage: "dot.radiowaves.left.and.right", value: TVTab.explore(.live)) {
+                Tab("Live", systemImage: AppSymbol.live, value: TVTab.explore(.live)) {
                     TVTabStack(tab: .explore(.live)) { TVFeedView(type: .live) }
                 }
-                Tab("Sports", systemImage: "sportscourt.fill", value: TVTab.explore(.sports)) {
+                Tab("Sports", systemImage: AppSymbol.sports, value: TVTab.explore(.sports)) {
                     TVTabStack(tab: .explore(.sports)) { TVFeedView(type: .sports) }
                 }
             }
 
             TabSection("Library") {
-                Tab("History", systemImage: "clock.arrow.circlepath", value: TVTab.history) {
+                Tab("History", systemImage: AppSymbol.history, value: TVTab.history) {
                     TVTabStack(tab: .history) { TVFeedView(type: .history) }
                 }
-                Tab("Watch Later", systemImage: "clock.fill", value: TVTab.watchLater) {
+                Tab("Watch Later", systemImage: AppSymbol.watchLaterFill, value: TVTab.watchLater) {
                     TVTabStack(tab: .watchLater) { TVFeedView(type: .watchLater) }
                 }
-                Tab("Playlists", systemImage: "list.bullet.rectangle.fill", value: TVTab.playlists) {
+                Tab("Playlists", systemImage: AppSymbol.playlists, value: TVTab.playlists) {
                     TVTabStack(tab: .playlists) { TVFeedView(type: .playlists) }
                 }
-                Tab("Channels", systemImage: "person.2.fill", value: TVTab.channels) {
+                Tab("Channels", systemImage: AppSymbol.accountsFill, value: TVTab.channels) {
                     TVTabStack(tab: .channels) { TVChannelsView() }
                 }
-                Tab("Queue", systemImage: "text.line.first.and.arrowtriangle.forward", value: TVTab.queue) {
+                Tab("Queue", systemImage: AppSymbol.upNext, value: TVTab.queue) {
                     TVTabStack(tab: .queue) {
                         TVPlaylistView(playlistId: CurrentQueueStore.playlistID, title: "Queue")
                     }
                 }
             }
 
-            Tab("Settings", systemImage: "gearshape.fill", value: TVTab.settings) {
+            Tab("Settings", systemImage: AppSymbol.settings, value: TVTab.settings) {
                 TVTabStack(tab: .settings, routable: false) { TVSettingsView() }
             }
         }
@@ -124,22 +132,22 @@ private struct TVLegacyTabs: View {
         @Bindable var navigator = navigator
         TabView(selection: $navigator.selection) {
             TVTabStack(tab: .home) { TVHomeView() }
-                .tabItem { Label("Home", systemImage: "house.fill") }
+                .tabItem { Label("Home", systemImage: AppSymbol.home) }
                 .tag(TVTab.home)
             TVTabStack(tab: .subscriptions) { TVFeedView(type: .subscriptions) }
-                .tabItem { Label("Subscriptions", systemImage: "play.square.stack.fill") }
+                .tabItem { Label("Subscriptions", systemImage: AppSymbol.subscriptions) }
                 .tag(TVTab.subscriptions)
             TVTabStack(tab: .search) { TVSearchView() }
-                .tabItem { Label("Search", systemImage: "magnifyingglass") }
+                .tabItem { Label("Search", systemImage: AppSymbol.search) }
                 .tag(TVTab.search)
             TVTabStack(tab: .history) { TVFeedView(type: .history) }
-                .tabItem { Label("History", systemImage: "clock.arrow.circlepath") }
+                .tabItem { Label("History", systemImage: AppSymbol.history) }
                 .tag(TVTab.history)
             TVTabStack(tab: .accounts) { TVAccountsView() }
-                .tabItem { Label("Accounts", systemImage: "person.crop.circle.fill") }
+                .tabItem { Label("Accounts", systemImage: AppSymbol.channel) }
                 .tag(TVTab.accounts)
             TVTabStack(tab: .settings, routable: false) { TVSettingsView() }
-                .tabItem { Label("Settings", systemImage: "gearshape.fill") }
+                .tabItem { Label("Settings", systemImage: AppSymbol.settings) }
                 .tag(TVTab.settings)
         }
     }

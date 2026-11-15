@@ -297,6 +297,12 @@ struct AppEntry: App {
                     .onChange(of: authService.isSignedIn) { _, signedIn in
                         if !signedIn { SpotlightIndexer.shared.syncChannels([]) }
                     }
+                    // Account switch: the previous account's channels and Home widget feed
+                    // must not linger (they're re-published once the new account loads).
+                    .onReceive(NotificationCenter.default.publisher(for: AccountScope.didChangeNotification)) { _ in
+                        SpotlightIndexer.shared.syncChannels([])
+                        HomeWidgetPublisher.clear()
+                    }
                     #endif
                     .onChange(of: scenePhase, initial: true) { _, phase in
                         if phase == .active {

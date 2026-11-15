@@ -38,11 +38,11 @@ extension AuthService {
         }
     }
 
-    func setActivePageId(_ pageId: String?) {
+    func setActivePageId(_ pageId: String?, notify: Bool = true) {
         activePageId = pageId
         ActiveChannel.shared.set(pageId: pageId)
         Task { await tokenManager.setPageId(pageId) }
-        NotificationCenter.default.post(name: .activeChannelDidChange, object: nil)
+        if notify { NotificationCenter.default.post(name: .activeChannelDidChange, object: nil) }
     }
 
     func resetChannels() {

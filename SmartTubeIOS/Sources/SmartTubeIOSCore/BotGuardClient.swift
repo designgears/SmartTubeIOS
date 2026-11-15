@@ -81,6 +81,11 @@ public final class BotGuardClient: PoTokenProvider, @unchecked Sendable {
 
     // MARK: - PoTokenProvider
 
+    public func resetCachedToken() {
+        cachedPoToken = nil
+        cachedPoTokenExpiry = nil
+    }
+
     public func token(for videoId: String) async throws -> String {
         // Return cached token if still valid — websafeFallbackToken from GenerateIT is
         // not video-specific so it can be reused across sequential video loads.

@@ -25,6 +25,7 @@ extension AuthService {
     /// On success, sets `self.sapisid` to the extracted value.
     /// All errors are caught internally; this method never throws.
     func fetchYouTubeWebCookies() async {
+        let generation = accountGeneration
         // Use validAccessToken() so we refresh an expired token before making API calls.
         // This handles the case where accessToken was cleared at startup (expired) but
         // refreshToken is still valid — common after an overnight Mac restart.
@@ -49,8 +50,17 @@ extension AuthService {
             if let infoJSON = try? JSONSerialization.jsonObject(with: infoData) as? [String: Any],
                 let sub = infoJSON["sub"] as? String, !sub.isEmpty
             {
+                // Only for the account this token belongs to: if the user switched or started
+                // adding an account meanwhile, this id is someone else's.
+                guard token == accessToken, generation == accountGeneration else {
+                    authLog.notice("[cookies] account changed during tokeninfo — discarding gaiaId")
+                    return
+                }
                 gaiaId = sub
                 authLog.notice("[cookies] gaiaId=\(sub) — MultiBearer Multilogin enabled")
+                // Record the verified id on this account's vault entry (it is saved at token
+                // exchange, before the id is known).
+                if isSignedIn { rememberActiveAccount() }
             } else {
                 authLog.notice("[cookies] gaiaId not in tokeninfo — token missing openid scope; need re-sign-in")
             }
@@ -84,7 +94,7 @@ extension AuthService {
             authLog.notice(
                 "[cookies] OAuthLogin did not redirect (HTTP \(code)) WWW-Authenticate=\(wwwAuth) — trying Multilogin fallback"
             )
-            await fetchSAPISIDViaMultilogin(token: token)
+            await fetchSAPISIDViaMultilogin(token: token, generation: generation)
             return
         }
 
@@ -108,6 +118,10 @@ extension AuthService {
         }
 
         authLog.notice("[cookies] ✅ SAPISID obtained — WEB_CREATOR SAPISIDHASH auth enabled")
+        guard generation == accountGeneration else {
+            authLog.notice("[cookies] account changed meanwhile — discarding SAPISID")
+            return
+        }
         sapisid = sapisidCookie.value
         // Persist to Keychain so it survives app restarts — no re-fetch needed on next launch.
         Task { await tokenManager.setSAPISID(sapisidCookie.value) }
@@ -123,7 +137,7 @@ extension AuthService {
     /// - Body: " " (space) to force POST — Chromium pattern
     ///
     /// Reference: chromium/src/google_apis/gaia/gaia_auth_fetcher.cc StartOAuthMultilogin()
-    private func fetchSAPISIDViaMultilogin(token: String) async {
+    private func fetchSAPISIDViaMultilogin(token: String, generation: Int) async {
         guard
             let url = URL(string: "https://accounts.google.com/oauth/multilogin?source=ChromiumBrowser&reuseCookies=0")
         else { return }
@@ -177,6 +191,10 @@ extension AuthService {
         }
 
         authLog.notice("[cookies] ✅ SAPISID obtained via Multilogin — WEB_CREATOR SAPISIDHASH auth enabled")
+        guard generation == accountGeneration else {
+            authLog.notice("[cookies] account changed meanwhile — discarding SAPISID")
+            return
+        }
         sapisid = value
         Task { await tokenManager.setSAPISID(value) }
     }

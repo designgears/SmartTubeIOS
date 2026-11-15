@@ -299,6 +299,14 @@ public actor InnerTubeAPI {
             Task { await self?.handlePathUpdate(path) }
         }
         pathMonitor.start(queue: .global(qos: .background))
+        // Session identity (visitorData, the VisionOS watch-page session, PO tokens) belongs
+        // to one account; drop it when the active account changes.
+        Task { [weak self] in
+            for await _ in NotificationCenter.default.notifications(named: AccountScope.didChangeNotification) {
+                guard let self else { return }
+                await self.resetAccountSessionState()
+            }
+        }
     }
 
     /// Package-internal initializer for testing only.
@@ -348,6 +356,18 @@ public actor InnerTubeAPI {
     /// Clears the stored per-device `visitorData` token.
     /// Called when the user disables "Per-Device Recommendations" in Settings so
     /// the next home-feed request uses YouTube's default shared recommendation algorithm.
+    /// Forgets session identity tied to the previous account. Auth tokens, SAPISID and the
+    /// Brand Account are set separately by AuthService when it switches.
+    public func resetAccountSessionState() {
+        visitorData = nil
+        visionOSSessionSeededAt = nil
+        poToken = nil
+        poTokenVideoId = nil
+        poTokenExpiry = nil
+        poTokenProvider?.resetCachedToken()
+        tubeLog.notice("account changed — cleared visitorData, VisionOS session and PO token")
+    }
+
     public func resetVisitorData() {
         visitorData = nil
         tubeLog.notice("visitorData cleared (per-device recommendations disabled)")

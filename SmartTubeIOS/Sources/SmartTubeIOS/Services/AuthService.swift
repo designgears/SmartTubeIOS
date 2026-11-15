@@ -73,6 +73,10 @@ public final class AuthService {
     public internal(set) var activeAccountId: String?
     /// While adding another account: the account to go back to if the user cancels.
     var accountToRestoreOnCancel: String?
+    /// Bumped on every account change. Async auth work (token refresh, user info, cookies,
+    /// device-code exchange) captures it and drops its result if the account changed meanwhile,
+    /// so a late response for the previous account is never applied to the new one.
+    var accountGeneration = 0
     var refreshToken: String?
     var tokenExpiry: Date?
     var pollTask: Task<Void, Never>?
@@ -193,6 +197,7 @@ public final class AuthService {
 
     /// Cancel an in-progress activation.
     public func cancelSignIn() {
+        accountGeneration += 1  // a token exchange still in flight must not apply
         pollTask?.cancel()
         pollTask = nil
         pendingActivation = nil
@@ -203,6 +208,16 @@ public final class AuthService {
             accountToRestoreOnCancel = nil
             if !isSignedIn { switchAccount(to: restore) }
         }
+    }
+
+    /// "Use a different account" on the sign-in screen: a fresh code for whichever Google
+    /// account the user signs in with — without leaving an in-progress "Add Account".
+    public func restartSignIn() {
+        accountGeneration += 1
+        pollTask?.cancel()
+        pollTask = nil
+        pendingActivation = nil
+        Task { await beginSignIn() }
     }
 
     /// Call when the app returns to the foreground while a sign-in is in progress.
@@ -238,12 +253,15 @@ public final class AuthService {
     }
 
     public func signOut() {
+        beginAccountChange()
         // Multi-account: signing out of one account switches to the next remaining one.
         let leaving = activeAccountId
         if let next = savedAccounts.first(where: { $0.id != leaving }) {
             savedAccounts.removeAll { $0.id == leaving }
             activeAccountId = nil
             switchAccount(to: next.id)
+            // The signed-out account's on-device data goes with it (once it is parked).
+            if let leaving { Task { @MainActor in AccountScope.forget(leaving) } }
             return
         }
         savedAccounts = []
@@ -259,10 +277,17 @@ public final class AuthService {
         tokenExpiry = nil
         accountName = nil
         accountAvatarURL = nil
+        // The Google account id must go too: adding an account clears the session and the
+        // next sign-in would otherwise inherit the previous account's id, which made the
+        // vault treat the new account as a duplicate and drop the previous one.
+        gaiaId = nil
         resetChannels()
         isSignedIn = false
         pendingActivation = nil
         clearKeychain()
+        clearAccountCookies()
+        syncAccountScope()  // back to the signed-out ("guest") data
+        if let leaving { Task { @MainActor in AccountScope.forget(leaving) } }
     }
 
     /// Clears the in-memory auth session without touching the keychain.
@@ -279,6 +304,10 @@ public final class AuthService {
         tokenExpiry = nil
         accountName = nil
         accountAvatarURL = nil
+        // "Add Account" clears the session before the next sign-in; a leftover Google id
+        // would be saved on the new account's vault entry and make it look like the
+        // previous account (which the vault then dropped as a duplicate).
+        gaiaId = nil
         resetChannels()
         isSignedIn = false
         pendingActivation = nil

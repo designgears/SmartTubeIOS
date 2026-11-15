@@ -141,20 +141,32 @@ public struct SettingsView: View {
                     showAddAccount = true
                 }
                 .accessibilityIdentifier("settings.addAccountButton")
-                .sheet(
-                    isPresented: $showAddAccount,
-                    onDismiss: {
-                        // Closed without finishing: go back to the previous account.
-                        if !auth.isSignedIn { auth.cancelSignIn() }
-                    }
-                ) { SignInView() }
+                // Signed-out use with its own on-device data; nobody is signed out.
+                Button("Use as Guest") { auth.switchToGuest() }
+                    .accessibilityIdentifier("settings.useAsGuestButton")
                 Button("Sign Out of \(auth.accountName ?? "This Account")", role: .destructive) { auth.signOut() }
             } else {
-                Button("Sign in with Google") { showSignIn = true }
+                // Guest: accounts signed in on this device are still one tap away.
+                ForEach(auth.savedAccounts) { account in
+                    Button("Switch to \(account.displayName ?? account.primaryName ?? "Account")") {
+                        auth.switchAccount(to: account.id)
+                    }
+                }
+                Button(auth.savedAccounts.isEmpty ? "Sign in with Google" : "Add Account") { showSignIn = true }
                     .accessibilityIdentifier("settings.signInButton")
                     .sheet(isPresented: $showSignIn) { SignInView() }
             }
         }
+        // On the section, not the "Add Account" button: starting an add signs the current
+        // account out of the session, which removes that button (and a sheet attached to it).
+        .sheet(
+            isPresented: $showAddAccount,
+            onDismiss: {
+                // Closed without finishing: go back to the previous account.
+                if !auth.isSignedIn { auth.cancelSignIn() }
+            },
+            content: { SignInView() }
+        )
     }
 
     // MARK: - Player

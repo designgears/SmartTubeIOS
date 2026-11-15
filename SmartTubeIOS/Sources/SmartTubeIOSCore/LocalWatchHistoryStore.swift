@@ -42,6 +42,15 @@ public final class LocalWatchHistoryStore {
         }
     }
 
+    /// Account switch (see `AccountScope`): park the live history, load the incoming account's.
+    public func switchAccountData(from outgoing: String?, to incoming: String) {
+        let current = try? JSONEncoder().encode(entries)
+        let saved = AccountScope.exchange(
+            key: Self.defaultsKey, current: current, outgoing: outgoing, incoming: incoming, defaults: defaults)
+        entries = (saved as? Data).flatMap { try? JSONDecoder().decode([LocalWatchHistoryEntry].self, from: $0) } ?? []
+        if let data = try? JSONEncoder().encode(entries) { defaults.set(data, forKey: Self.defaultsKey) }
+    }
+
     /// Records `video` as watched now, moving it to the front if already present and
     /// evicting the oldest entries beyond `maxEntries`. Only identity/display fields are
     /// kept — per-fetch state like tracking tokens is dropped so stale tokens are never

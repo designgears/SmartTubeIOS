@@ -182,6 +182,14 @@ public final class HomeViewModel {
                     self.load()
                 }
             })
+        hideObserverTasks.append(
+            Task { [weak self] in
+                // Another account (or Guest) is now active: nothing on screen is theirs.
+                for await _ in NotificationCenter.default.notifications(named: AccountScope.didChangeNotification) {
+                    guard let self else { return }
+                    self.load()
+                }
+            })
     }
 
     public func removeVideo(id: String) {

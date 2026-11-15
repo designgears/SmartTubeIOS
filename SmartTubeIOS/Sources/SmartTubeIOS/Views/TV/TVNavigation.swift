@@ -44,6 +44,14 @@ final class TVNavigator {
     var nowPlaying: TVPlayRequest?
     private var paths: [TVTab: NavigationPath] = [:]
 
+    /// Back to a fresh Home (player closed, every tab's stack emptied) — used when the
+    /// active account changes so nothing from the previous account stays on screen.
+    func resetForAccountChange() {
+        nowPlaying = nil
+        paths = [:]
+        selection = .home
+    }
+
     func path(for tab: TVTab) -> Binding<NavigationPath> {
         Binding(
             get: { self.paths[tab] ?? NavigationPath() },

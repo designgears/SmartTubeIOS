@@ -309,7 +309,7 @@ public struct SignInView: View {
                 .padding(.top, 8)
 
                 Button(role: .cancel) {
-                    auth.cancelSignIn()
+                    auth.restartSignIn()
                 } label: {
                     Text("Use a different account")
                         .font(.subheadline)

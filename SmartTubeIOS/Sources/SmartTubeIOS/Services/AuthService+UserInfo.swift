@@ -6,6 +6,7 @@ extension AuthService {
     // MARK: - User info
 
     func fetchUserInfo() async throws {
+        let generation = accountGeneration
         authLog.notice("fetchUserInfo() — calling validAccessToken()")
         let token = try await validAccessToken()
         authLog.notice("fetchUserInfo() — token len=\(token.count), calling InnerTube accounts_list API")
@@ -35,6 +36,10 @@ extension AuthService {
         let (data, response) = try await URLSession.shared.data(for: req)
         let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
         authLog.notice("fetchUserInfo() — HTTP \(statusCode)")
+        guard generation == accountGeneration else {
+            authLog.notice("fetchUserInfo() — account changed meanwhile — discarding")
+            return
+        }
         if let bodyStr = String(data: data, encoding: .utf8) {
             authLog.notice("fetchUserInfo() — response: \(String(bodyStr.prefix(600)))")
         }

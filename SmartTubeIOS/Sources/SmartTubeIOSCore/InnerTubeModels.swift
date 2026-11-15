@@ -7,6 +7,12 @@ import Foundation
 /// All implementations must be safe to call concurrently for different video IDs.
 public protocol PoTokenProvider: Sendable {
     func token(for videoId: String) async throws -> String
+    /// Forgets any cached token (account change: tokens are bound to the session identity).
+    func resetCachedToken()
+}
+
+extension PoTokenProvider {
+    public func resetCachedToken() {}
 }
 
 // MARK: - LikeStatus

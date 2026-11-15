@@ -69,6 +69,7 @@ public actor SearchHistoryStore: UserDefaultsBackedStore {
 
     // MARK: - UserDefaultsBackedStore
 
+    static var emptyValue: [SearchHistoryEntry] { [] }
     func encodedValue() -> [SearchHistoryEntry] { entries }
     func decodeValue(_ decoded: [SearchHistoryEntry]) { entries = decoded }
 }

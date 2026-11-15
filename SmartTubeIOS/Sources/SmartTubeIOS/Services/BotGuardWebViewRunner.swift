@@ -514,6 +514,12 @@ public final class BotGuardWebViewRunner: NSObject {
         }
     }
 
+    /// Account switch: the minted token and web visitorData belonged to the previous account.
+    public func resetForAccountChange() {
+        invalidate()
+        webVisitorData = ""
+    }
+
     /// Destroys the WKWebView entirely (call on TTL expiry or app backgrounding).
     private func invalidate() {
         mintCallbackReady = false

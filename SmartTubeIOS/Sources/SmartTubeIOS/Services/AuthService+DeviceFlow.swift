@@ -95,6 +95,7 @@ extension AuthService {
     }
 
     func exchangeDeviceCode(deviceCode: String, creds: YouTubeClientCredentials) async throws {
+        let generation = accountGeneration
         var req = URLRequest(url: Self.tokenURL)
         req.httpMethod = "POST"
         req.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
@@ -124,6 +125,12 @@ extension AuthService {
         }
 
         guard (200..<300).contains(statusCode) else { throw AuthError.tokenExchangeFailed }
+        // Sign-in was cancelled (or the account changed) while the token was in flight:
+        // don't overwrite the account that is active now.
+        guard generation == accountGeneration, !Task.isCancelled else {
+            authLog.notice("exchangeDeviceCode: sign-in cancelled meanwhile — discarding tokens")
+            throw CancellationError()
+        }
 
         accessToken = json["access_token"] as? String
         if let r = json["refresh_token"] as? String { refreshToken = r }

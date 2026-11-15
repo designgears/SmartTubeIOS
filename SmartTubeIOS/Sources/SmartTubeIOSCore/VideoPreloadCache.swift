@@ -508,6 +508,27 @@ public actor VideoPreloadCache {
         trackingCache.removeAll()
     }
 
+    /// Drops everything prefetched, in memory and on disk — used when the account changes,
+    /// since player/next responses (like status) and tracking URLs belong to one account.
+    public func removeAll() {
+        disk.removeAll()
+        for task in prefetchTasks.values { task.cancel() }
+        for task in inFlightPlayerFetches.values { task.cancel() }
+        prefetchTasks = [:]
+        inFlightPlayerFetches = [:]
+        prefetchQueue = []
+        playerInfoCache = [:]
+        trackingCache = [:]
+        nextInfoCache = [:]
+        endCardsCache = [:]
+        sponsorCache = [:]
+        deArrowCache = [:]
+        wkHLSCache = [:]
+        wkHLSPoTokenCache = [:]
+        wkHLSIsPreWarmCache = [:]
+        accessOrder = []
+    }
+
     /// Call when a 403 is received for a cached player-info URL.
     /// The cached URL is IP-bound and is now stale; evicting forces a fresh fetch on next load.
     public func invalidatePlayerInfo(for videoId: String) {

@@ -34,7 +34,7 @@ public final class SettingsStore {
     /// PlayerRouter (the only reader) is `#if os(iOS)`.
     public var useTOSPlayerOnIOS: Bool = true
 
-    private static let key = "smarttube_app_settings"
+    private static let key = AccountScope.settingsKey
 
     public init() {
         if let data = UserDefaults.standard.data(forKey: Self.key),
@@ -67,6 +67,38 @@ public final class SettingsStore {
         if ProcessInfo.processInfo.arguments.contains("--uitesting-disable-tos-player-on-ios") {
             self.useTOSPlayerOnIOS = false
         }
+        AccountScope.settingsSwitcher = { [weak self] outgoing, incoming, isNewAccount in
+            self?.switchAccountData(from: outgoing, to: incoming, isNewAccount: isNewAccount)
+        }
+    }
+
+    /// Settings belong to the account (see `AccountScope`): park the live settings under the
+    /// outgoing account and make the incoming account's live. Runs synchronously on the main
+    /// actor, before any view reloads for the new account.
+    private func switchAccountData(from outgoing: String?, to incoming: String, isNewAccount: Bool) {
+        let saved = AccountScope.exchange(
+            key: Self.key, current: try? JSONEncoder().encode(settings), outgoing: outgoing, incoming: incoming)
+        var next =
+            (saved as? Data).flatMap { try? JSONDecoder().decode(AppSettings.self, from: $0) }
+            ?? Self.startingSettings(from: settings)
+        // Device-level, not per account: the parental PIN (switching accounts must not get
+        // past it) and switches that are only read at launch.
+        next.settingsPINHash = settings.settingsPINHash
+        next.disableAnalytics = settings.disableAnalytics
+        next.disableLiquidGlass = settings.disableLiquidGlass
+        next.poTokenServiceURL = settings.poTokenServiceURL
+        settings = next
+        settingsLog.notice("settings switched to the active account (new=\(isNewAccount, privacy: .public))")
+    }
+
+    /// A new account (or Guest) starts from the current preferences, without the previous
+    /// account's own data.
+    private static func startingSettings(from current: AppSettings) -> AppSettings {
+        var settings = current
+        settings.channelPlaybackSpeeds = [:]
+        settings.blockedChannels = [:]
+        settings.sponsorBlockExcludedChannels = [:]
+        return settings
     }
 
     private func save() {

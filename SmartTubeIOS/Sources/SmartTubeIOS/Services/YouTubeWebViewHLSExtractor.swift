@@ -759,6 +759,16 @@ final class YouTubeWebViewHLSExtractor: NSObject {
         finish(url: url)
     }
 
+    /// Account switch: abandon any extraction and drop the web view; its session belonged to
+    /// the previous account (the website data itself is cleared by AuthService).
+    func resetForAccountChange() {
+        extractionGeneration += 1
+        finish(url: nil)
+        webView?.navigationDelegate = nil
+        webView?.stopLoading()
+        webView = nil
+    }
+
     private func finish(url: URL?) {
         timeoutTask?.cancel()
         timeoutTask = nil

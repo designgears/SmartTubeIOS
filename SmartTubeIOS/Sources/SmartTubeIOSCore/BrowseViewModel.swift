@@ -124,6 +124,15 @@ public final class BrowseViewModel {
                     self.loadContent(refresh: true, source: "channelSwitch")
                 }
             })
+        hideObserverTasks.append(
+            Task { [weak self] in
+                // Another account (or Guest) is now active: drop what's shown and reload.
+                for await _ in NotificationCenter.default.notifications(named: AccountScope.didChangeNotification) {
+                    guard let self else { return }
+                    self.videoGroups = []
+                    self.loadContent(refresh: true, source: "accountChange")
+                }
+            })
     }
 
     public func removeVideo(id: String) {

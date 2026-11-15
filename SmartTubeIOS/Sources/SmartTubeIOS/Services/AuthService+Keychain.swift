@@ -11,6 +11,10 @@ extension AuthService {
         let expiry = tokenExpiry
         let name = accountName
         let avatar = accountAvatarURL
+        // The whole active session is written together, so the Keychain never pairs one
+        // account's tokens with another account's Brand channel or SAPISID.
+        let pageId = activePageId
+        let sapisidValue = sapisid
         Task {
             await tokenManager.setToken(
                 access: access,
@@ -19,6 +23,8 @@ extension AuthService {
                 accountName: name,
                 avatarURL: avatar
             )
+            await tokenManager.setPageId(pageId)
+            await tokenManager.setSAPISID(sapisidValue)
         }
         rememberActiveAccount()
     }

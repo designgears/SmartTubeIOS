@@ -127,6 +127,7 @@ public actor CurrentQueueStore: UserDefaultsBackedStore {
 
     // MARK: - UserDefaultsBackedStore
 
+    static var emptyValue: [Video] { [] }
     func encodedValue() -> [Video] { videos }
     func decodeValue(_ decoded: [Video]) { videos = decoded }
 

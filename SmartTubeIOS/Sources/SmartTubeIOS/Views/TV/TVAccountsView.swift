@@ -6,6 +6,7 @@ import SwiftUI
 
 /// "Who's watching?" — every Google account signed in on this Apple TV. Select one to
 /// switch (feeds, history and subscriptions follow it); long-press to sign it out.
+/// "Guest" is signed-out use with its own on-device data, without signing anyone out.
 struct TVAccountsView: View {
     @Environment(AuthService.self) private var auth
     @Environment(TVNavigator.self) private var navigator
@@ -35,9 +36,18 @@ struct TVAccountsView: View {
                             navigator.selection = .home
                         }
                         .contextMenu {
-                            Button("Sign Out", systemImage: "rectangle.portrait.and.arrow.right", role: .destructive) {
+                            Button("Sign Out", systemImage: AppSymbol.signOut, role: .destructive) {
                                 auth.removeAccount(account.id)
                             }
+                        }
+                    }
+                    if !auth.savedAccounts.isEmpty {
+                        // Signed-out use with its own history/settings; nobody is signed out.
+                        TVAddAccountCard(
+                            title: "Guest", symbol: AppSymbol.person, subtitle: auth.isGuest ? "Current" : nil
+                        ) {
+                            auth.switchToGuest()
+                            navigator.selection = .home
                         }
                     }
                     TVAddAccountCard(title: auth.savedAccounts.isEmpty ? "Sign In" : "Add Account") {
@@ -56,15 +66,16 @@ struct TVAccountsView: View {
             onDismiss: {
                 // Closed without finishing: return to the previous account.
                 if !auth.isSignedIn { auth.cancelSignIn() }
-            }
-        ) {
-            SignInView()
-        }
+            },
+            content: { SignInView() }
+        )
     }
 }
 
 struct TVAddAccountCard: View {
     let title: String
+    var symbol: String = AppSymbol.plus
+    var subtitle: String?
     let action: () -> Void
 
     var body: some View {
@@ -72,7 +83,8 @@ struct TVAddAccountCard: View {
             VStack(spacing: 18) {
                 ZStack {
                     Circle().fill(Color.white.opacity(0.1))
-                    Image(systemName: "plus").font(.system(size: 64, weight: .medium)).foregroundStyle(.secondary)
+                    Image(systemName: symbol).font(.system(size: 64, weight: .medium)).foregroundStyle(
+                        .secondary)
                 }
                 .frame(width: TVLayout.channelSize, height: TVLayout.channelSize)
                 .clipShape(Circle())
@@ -80,6 +92,9 @@ struct TVAddAccountCard: View {
                 Text(title)
                     .font(.callout.weight(.semibold))
                     .frame(width: TVLayout.channelSize + 60)
+                if let subtitle {
+                    Text(subtitle).font(.caption).foregroundStyle(.secondary)
+                }
             }
         }
         .buttonStyle(TVPlainFocusButtonStyle())

@@ -6,6 +6,7 @@ extension AuthService {
     // MARK: - Token refresh
 
     func refreshAccessToken(refreshToken: String, creds: YouTubeClientCredentials) async throws {
+        let generation = accountGeneration
         var req = URLRequest(url: Self.tokenURL)
         req.httpMethod = "POST"
         req.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
@@ -18,6 +19,12 @@ extension AuthService {
 
         let (data, response) = try await URLSession.shared.data(for: req)
         let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
+        // The account changed while refreshing: this result (or failure) is not the active
+        // account's — applying it would mix tokens, or sign out the wrong account.
+        guard generation == accountGeneration, self.refreshToken == refreshToken else {
+            authLog.notice("refreshAccessToken: account changed meanwhile — discarding result")
+            throw CancellationError()
+        }
 
         // Detect permanent refresh-token failures (revoked, expired, invalid credentials).
         // Google returns HTTP 400/401 with {"error":"invalid_grant"} or "invalid_client".

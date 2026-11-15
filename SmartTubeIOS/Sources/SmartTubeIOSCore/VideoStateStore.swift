@@ -80,6 +80,7 @@ public actor VideoStateStore: UserDefaultsBackedStore {
 
     // MARK: - UserDefaultsBackedStore
 
+    static var emptyValue: [String: State] { [:] }
     func encodedValue() -> [String: State] { states }
     func decodeValue(_ decoded: [String: State]) { states = decoded }
 

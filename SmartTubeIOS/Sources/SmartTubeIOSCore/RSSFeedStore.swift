@@ -35,6 +35,26 @@ public actor RSSFeedStore {
         }
     }
 
+    /// Account switch (see `AccountScope`): park the live feeds, load the incoming account's.
+    public func switchAccountData(from outgoing: String?, to incoming: String) {
+        let saved = AccountScope.exchange(
+            key: Self.udKey, current: defaults.data(forKey: Self.udKey), outgoing: outgoing, incoming: incoming,
+            defaults: defaults)
+        if let data = saved as? Data {
+            defaults.set(data, forKey: Self.udKey)
+        } else {
+            defaults.removeObject(forKey: Self.udKey)
+        }
+        guard let data = saved as? Data,
+            let decoded = try? JSONDecoder().decode([String: RSSFeedInfo].self, from: data)
+        else {
+            feeds = [:]
+            return
+        }
+        feeds = Dictionary(
+            uniqueKeysWithValues: decoded.compactMap { key, value in UUID(uuidString: key).map { ($0, value) } })
+    }
+
     /// Designated initializer for unit testing.
     /// Pass a unique `suiteName` string to get a fully isolated store.
     init(suiteName: String) {

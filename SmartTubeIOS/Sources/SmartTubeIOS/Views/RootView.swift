@@ -11,6 +11,13 @@ private let rootLog = Logger(subsystem: "com.void.smarttube.app", category: "Roo
 
 public struct RootView: View {
     @Environment(AuthService.self) private var auth
+    #if os(iOS)
+    @Environment(PlayerStateStore.self) private var accountPlayerState
+    @Environment(TOSPlayerStateStore.self) private var accountTOSState
+    #endif
+    /// Bumped when the active account changes; rebuilds the whole UI (tabs, navigation
+    /// stacks, Search, Library…) so nothing from the previous account stays on screen.
+    @State private var accountGeneration = 0
     @Environment(SettingsStore.self) private var store
     @Environment(BrowseViewModel.self) private var browseVM
     @Environment(\.innerTubeAPI) private var api
@@ -43,6 +50,20 @@ public struct RootView: View {
             MainTabView()
             #endif
         }
+        #if !os(tvOS)  // TVRootView rebuilds itself
+        .id(accountGeneration)
+        .onReceive(NotificationCenter.default.publisher(for: AccountScope.willChangeNotification)) { _ in
+            // Stop while the previous account is still live, so its progress is saved to it.
+            #if os(iOS)
+            if accountPlayerState.presentation != .hidden { accountPlayerState.stop() }
+            if accountTOSState.presentation != .hidden { accountTOSState.stop() }
+            accountTOSState.forgetHistory()
+            #endif
+        }
+        .onReceive(NotificationCenter.default.publisher(for: AccountScope.didChangeNotification)) { _ in
+            accountGeneration += 1
+        }
+        #endif
         .environment(\.isLandscapeLayout, isLandscapeLayout)
         .onGeometryChange(for: Bool.self) { $0.size.width > $0.size.height } action: { isLandscapeLayout = $0 }
         .tint(store.settings.accentColor.color)

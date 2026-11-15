@@ -291,6 +291,12 @@ public final class TOSPlayerStateStore {
         action?()
     }
 
+    /// Account switch: the back-stack is the previous account's viewing.
+    public func forgetHistory() {
+        history = []
+        seenVideoIds = []
+    }
+
     /// Mark a video as requiring AVPlayer fallback (embedding disabled / not found).
     /// The next play() call for this videoId will be routed to AVPlayer by the caller.
     public func markFallback(videoId: String) {
