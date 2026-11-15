@@ -306,7 +306,8 @@ public final class BrowseViewModel {
         let ageDesc = age.isFinite ? "\(Int(age))s" : "never loaded"
         browseLog.notice(
             "refreshIfStale: age=\(ageDesc) > threshold=\(Int(threshold))s — refreshing \(currentSection.title)")
-        loadContent(refresh: true, source: "refreshIfStale")
+        // In place: the page keeps what it shows until the fresh list replaces it.
+        refreshInPlace()
     }
 
     /// Update whether history is enabled. If currently on the history section, reloads it.
@@ -327,7 +328,10 @@ public final class BrowseViewModel {
         hasAuthToken = token != nil
         await api.setAuthToken(token)
         if token != nil {
-            // Signed in — reload everything
+            // Signed in — load. A new token while already signed in is the same account's
+            // periodic refresh: reloading would blank the page and lose the scroll position.
+            // (An account or channel switch reloads via AccountScope.didChangeNotification.)
+            guard !wasAuthenticated else { return }
             loadContent(refresh: true, source: "updateAuthToken")
         } else if wasAuthenticated {
             // Signed out — reload auth-gated sections to show local content instead

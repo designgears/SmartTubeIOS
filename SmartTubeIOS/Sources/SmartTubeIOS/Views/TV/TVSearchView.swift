@@ -44,13 +44,19 @@ struct TVSearchView: View {
 
     @ViewBuilder
     private func content(_ vm: SearchViewModel) -> some View {
-        if !vm.results.isEmpty {
+        if !vm.results.isEmpty || (didSearch && vm.isLoading) {
+            // The filter bar stays put while results (re)load, so changing Sort or Upload date
+            // doesn't pull the focused control out from under the remote.
             filterBar(vm)
-            TVVideoGrid(
-                videos: vm.results.uniquedByID(),
-                onReachEnd: { vm.loadMore() },
-                onSelect: { navigator.play($0) }
-            )
+            if vm.results.isEmpty {
+                TVLoadingView(message: "Searching…").frame(height: 500)
+            } else {
+                TVVideoGrid(
+                    videos: vm.results.uniquedByID(),
+                    onReachEnd: { vm.loadMore() },
+                    onSelect: { navigator.play($0) }
+                )
+            }
         } else if vm.isLoading {
             TVLoadingView(message: "Searching…").frame(height: 500)
         } else if let error = vm.error {

@@ -534,6 +534,25 @@ extension ActiveChannelSuites {
     @MainActor
     struct BrowseViewModelTests {
 
+        /// A new token while signed in is the same account's periodic refresh: the page must
+        /// not be blanked and reloaded (account switches reload via AccountScope instead).
+        @Test("A token refresh while signed in does not reload the section")
+        func tokenRefreshDoesNotReload() async {
+            let mock = MockInnerTubeAPI()
+            mock.subscriptionsResult = VideoGroup(title: "Subs", videos: [makeVideo("subvid_AAAA")])
+            let section = BrowseSection(id: "subscriptions", title: "Subscriptions", type: .subscriptions)
+            let vm = BrowseViewModel(api: mock, initialSection: section)
+            await vm.updateAuthToken("token-1")
+            await vm.awaitPendingFetch()
+            let fetches = mock.calls.filter { $0.method == "fetchSubscriptions" }.count
+
+            await vm.updateAuthToken("token-2")
+            await vm.awaitPendingFetch()
+
+            #expect(mock.calls.filter { $0.method == "fetchSubscriptions" }.count == fetches)
+            #expect(vm.videoGroups.first?.videos.first?.id == "subvid_AAAA", "the page keeps its content")
+        }
+
         @Test("loadContent for .subscriptions calls fetchSubscriptions and populates videoGroups")
         func loadSubscriptionsPopulatesGroups() async {
             let mock = MockInnerTubeAPI()
