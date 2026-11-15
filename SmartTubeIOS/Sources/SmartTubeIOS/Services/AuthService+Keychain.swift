@@ -30,6 +30,7 @@ extension AuthService {
     }
 
     func loadFromKeychain() {
+        if seedFakeAccountsForUITesting() { return }
         let snap = tokenManager.initialSnapshot
         accessToken = snap.accessToken
         refreshToken = snap.refreshToken

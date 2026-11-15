@@ -52,16 +52,19 @@ extension AuthService {
         } else {
             accessToken = nil
         }
-        isSignedIn = refreshToken != nil || accessToken != nil
+        isSignedIn = refreshToken != nil || accessToken != nil || target.isLocalOnly
         // No channel-change notification: feeds reload on AccountScope's didChange, once the
         // incoming account's on-device data is live.
         setActivePageId(target.pageId, notify: false)
         let sapisidValue = target.sapisid
         Task { await tokenManager.setSAPISID(sapisidValue) }
         saveToKeychain()
+        // saveToKeychain → rememberActiveAccount syncs too, but skips token-less local profiles.
+        syncAccountScope()
         scheduleProactiveRefresh()
         authLog.notice("switchAccount() — now \(self.accountName ?? "unknown") (\(self.savedAccounts.count) accounts)")
 
+        guard !target.isLocalOnly else { return }  // no Google login: nothing to fetch
         Task {
             do { try await fetchUserInfo() } catch {
                 authLog.error("switchAccount() fetchUserInfo failed: \(String(describing: error))")
@@ -112,6 +115,38 @@ extension AuthService {
         savedAccounts.removeAll { $0.id == id }
         persistSavedAccounts()
         AccountScope.forget(id)
+    }
+
+    // MARK: UI testing
+
+    /// `--uitesting --uitesting-fake-accounts` adds two local-only profiles ("Alex", "Sam") — no
+    /// Google login, so feeds load signed out like Guest — to drive account switching end to end
+    /// in UI tests. `--uitesting-fake-account-active=<uitest-alex|uitest-sam|guest>` picks who is
+    /// active at launch. Returns false (and does nothing) outside UI tests.
+    func seedFakeAccountsForUITesting() -> Bool {
+        let args = ProcessInfo.processInfo.arguments
+        guard args.contains("--uitesting"), args.contains("--uitesting-fake-accounts") else { return false }
+        func profile(_ id: String, _ name: String) -> SavedAccount {
+            var account = SavedAccount(id: id)
+            account.displayName = name
+            account.primaryName = name
+            account.localOnly = true
+            return account
+        }
+        savedAccounts = [profile("uitest-alex", "Alex"), profile("uitest-sam", "Sam")]
+        let prefix = "--uitesting-fake-account-active="
+        let activeId = args.first { $0.hasPrefix(prefix) }.map { String($0.dropFirst(prefix.count)) } ?? "uitest-alex"
+        if let active = savedAccounts.first(where: { $0.id == activeId }) {
+            activeAccountId = active.id
+            accountName = active.displayName
+            isSignedIn = true
+        } else {
+            activeAccountId = nil
+            isSignedIn = false
+        }
+        authLog.notice("[uitesting] local test profiles seeded — active=\(activeId)")
+        syncAccountScope()
+        return true
     }
 
     // MARK: Internals

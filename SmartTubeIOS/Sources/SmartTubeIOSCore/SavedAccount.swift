@@ -18,6 +18,9 @@ public struct SavedAccount: Codable, Sendable, Identifiable, Equatable {
     public var sapisid: String?
     /// Selected Brand Account for this login (nil = primary).
     public var pageId: String?
+    /// A profile with no Google login (UI tests): its own on-device data, signed-out API calls.
+    public var localOnly: Bool?
+    public var isLocalOnly: Bool { localOnly == true }
 
     public init(id: String = UUID().uuidString) {
         self.id = id

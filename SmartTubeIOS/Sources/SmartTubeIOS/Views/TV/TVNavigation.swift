@@ -44,10 +44,11 @@ final class TVNavigator {
     var nowPlaying: TVPlayRequest?
     private var paths: [TVTab: NavigationPath] = [:]
 
-    /// Back to a fresh Home (player closed, every tab's stack emptied) — used when the
-    /// active account changes so nothing from the previous account stays on screen.
+    /// Back to a fresh Home (every tab's stack emptied) — used when the active account changes
+    /// so nothing from the previous account stays on screen. The player is not touched here:
+    /// it closes on `AccountScope.willChangeNotification` (TVPlayerScreen), before the switch,
+    /// and a video opened after the switch began (e.g. a launch deep link) must keep playing.
     func resetForAccountChange() {
-        nowPlaying = nil
         paths = [:]
         selection = .home
     }
