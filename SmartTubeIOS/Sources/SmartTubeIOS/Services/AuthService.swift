@@ -68,6 +68,11 @@ public final class AuthService {
     /// or from tokeninfo when `openid` scope is present. Required by the Chromium-style Multilogin
     /// endpoint (Authorization: MultiBearer {token}:{gaiaId}).
     public internal(set) var gaiaId: String?
+    /// Every Google account signed in on this device (multi-account), and the active one.
+    public internal(set) var savedAccounts: [SavedAccount] = []
+    public internal(set) var activeAccountId: String?
+    /// While adding another account: the account to go back to if the user cancels.
+    var accountToRestoreOnCancel: String?
     var refreshToken: String?
     var tokenExpiry: Date?
     var pollTask: Task<Void, Never>?
@@ -193,6 +198,11 @@ public final class AuthService {
         pendingActivation = nil
         currentDeviceCode = nil
         currentCreds = nil
+        // Cancelled while adding another account: go back to the previous one.
+        if let restore = accountToRestoreOnCancel {
+            accountToRestoreOnCancel = nil
+            if !isSignedIn { switchAccount(to: restore) }
+        }
     }
 
     /// Call when the app returns to the foreground while a sign-in is in progress.
@@ -228,6 +238,17 @@ public final class AuthService {
     }
 
     public func signOut() {
+        // Multi-account: signing out of one account switches to the next remaining one.
+        let leaving = activeAccountId
+        if let next = savedAccounts.first(where: { $0.id != leaving }) {
+            savedAccounts.removeAll { $0.id == leaving }
+            activeAccountId = nil
+            switchAccount(to: next.id)
+            return
+        }
+        savedAccounts = []
+        activeAccountId = nil
+        persistSavedAccounts()
         pollTask?.cancel()
         pollTask = nil
         tokenRefreshTask?.cancel()

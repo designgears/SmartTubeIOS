@@ -20,6 +20,7 @@ extension AuthService {
                 avatarURL: avatar
             )
         }
+        rememberActiveAccount()
     }
 
     func loadFromKeychain() {
@@ -48,6 +49,7 @@ extension AuthService {
         if isSignedIn && sapisid == nil {
             Task { await self.fetchYouTubeWebCookies() }
         }
+        loadSavedAccounts()
     }
 
     func clearKeychain() {

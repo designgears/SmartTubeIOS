@@ -11,6 +11,7 @@ public struct SettingsView: View {
     @Environment(AuthService.self) private var auth
     @Environment(SettingsStore.self) private var store
     @State private var showSignIn = false
+    @State private var showAddAccount = false
     @State private var reportSent = false
     #if os(tvOS)
     @State private var showGithubQR = false
@@ -123,7 +124,25 @@ public struct SettingsView: View {
                     LabeledContent("Channel", value: auth.activeChannel?.name ?? "")
                 }
                 .accessibilityIdentifier("settings.channelLink")
-                Button("Sign Out", role: .destructive) { auth.signOut() }
+                // Multi-account: other accounts signed in on this device.
+                ForEach(auth.savedAccounts.filter { $0.id != auth.activeAccountId }) { account in
+                    Button("Switch to \(account.displayName ?? account.primaryName ?? "Account")") {
+                        auth.switchAccount(to: account.id)
+                    }
+                }
+                Button("Add Account") {
+                    auth.prepareToAddAccount()
+                    showAddAccount = true
+                }
+                .accessibilityIdentifier("settings.addAccountButton")
+                .sheet(
+                    isPresented: $showAddAccount,
+                    onDismiss: {
+                        // Closed without finishing: go back to the previous account.
+                        if !auth.isSignedIn { auth.cancelSignIn() }
+                    }
+                ) { SignInView() }
+                Button("Sign Out of \(auth.accountName ?? "This Account")", role: .destructive) { auth.signOut() }
             } else {
                 Button("Sign in with Google") { showSignIn = true }
                     .accessibilityIdentifier("settings.signInButton")

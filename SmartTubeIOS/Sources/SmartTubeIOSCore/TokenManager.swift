@@ -60,6 +60,12 @@ public actor TokenManager {
     /// `nonisolated let` — AuthService.init() reads this without `await`.
     public nonisolated let initialSnapshot: Snapshot
 
+    /// All accounts signed in on this device (see `SavedAccount`) and which one is active,
+    /// as stored at init time. Kept separately from the active-account keys so signing out
+    /// of one account never touches the others.
+    public nonisolated let initialSavedAccounts: [SavedAccount]
+    public nonisolated let initialActiveAccountId: String?
+
     // MARK: - Init
 
     public init(keychainService: String = "com.smarttube.auth") {
@@ -85,6 +91,11 @@ public actor TokenManager {
             pageId: Self.kcGet(service: keychainService, key: "st_page_id")
         )
         initialSnapshot = snap
+        initialSavedAccounts =
+            Self.kcGet(service: keychainService, key: "st_saved_accounts")
+            .flatMap { $0.data(using: .utf8) }
+            .flatMap { try? JSONDecoder().decode([SavedAccount].self, from: $0) } ?? []
+        initialActiveAccountId = Self.kcGet(service: keychainService, key: "st_active_account_id")
         accessToken = snap.accessToken
         refreshToken = snap.refreshToken
         tokenExpiry = snap.tokenExpiry
@@ -132,6 +143,13 @@ public actor TokenManager {
     public func setPageId(_ value: String?) {
         pageId = value
         Self.kcSet(service: service, key: "st_page_id", value: value)
+    }
+
+    /// Persists the multi-account vault and the active account id.
+    public func setSavedAccounts(_ accounts: [SavedAccount], activeId: String?) {
+        let json = (try? JSONEncoder().encode(accounts)).flatMap { String(data: $0, encoding: .utf8) }
+        Self.kcSet(service: service, key: "st_saved_accounts", value: accounts.isEmpty ? nil : json)
+        Self.kcSet(service: service, key: "st_active_account_id", value: activeId)
     }
 
     public func clearToken() {
