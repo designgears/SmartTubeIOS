@@ -23,7 +23,7 @@ extension InnerTubeAPI {
         body["racyCheckOk"] = true
         body["contentCheckOk"] = true
         let data = try await postPlayer(body: body)
-        var info = try parsePlayerInfo(from: data, videoId: videoId)
+        var info = try await parsePlayerInfo(from: data, videoId: videoId)
         // Apply a WKWebView-extracted pot= token (Option B) when available.
         // The token is stored by storeExternalPoToken() after the hidden WKWebView
         // extracts it from the YouTube player's /player API request body.
@@ -45,7 +45,7 @@ extension InnerTubeAPI {
         body["racyCheckOk"] = true
         body["contentCheckOk"] = true
         let data = try await post(endpoint: "player", body: body)
-        return try parsePlayerInfo(from: data, videoId: videoId)
+        return try await parsePlayerInfo(from: data, videoId: videoId, usesJSPlayer: true)
     }
 
     /// Fetches player info using the WebSafari client with `serviceIntegrityDimensions.poToken`
@@ -94,7 +94,7 @@ extension InnerTubeAPI {
         // while the body has webVD (WEB session) — YouTube would tie CDN URLs to the iOS
         // session but our token is minted for the WEB session → CDN validation fails (403).
         let data = try await postWebSafari(body: body, visitorIdOverride: webVD)
-        var info = try parsePlayerInfo(from: data, videoId: videoId)
+        var info = try await parsePlayerInfo(from: data, videoId: videoId, usesJSPlayer: true)
         if hasPot, let pot = poToken {
             tubeLog.notice(
                 "[InnerTube] ✅ poToken applied to \(videoId, privacy: .public) via WebSafari+pot client (len=\(pot.count))"
@@ -114,7 +114,7 @@ extension InnerTubeAPI {
         body["racyCheckOk"] = true
         body["contentCheckOk"] = true
         let data = try await postAndroid(endpoint: "player", body: body)
-        return try parsePlayerInfo(from: data, videoId: videoId)
+        return try await parsePlayerInfo(from: data, videoId: videoId)
     }
 
     /// Fetches player info using the Android VR (Oculus) client.
@@ -143,7 +143,7 @@ extension InnerTubeAPI {
         body["contentCheckOk"] = true
         body["playbackContext"] = ["contentPlaybackContext": cpbc]
         let data = try await postAndroidVR(body: body)
-        return try parsePlayerInfo(from: data, videoId: videoId)
+        return try await parsePlayerInfo(from: data, videoId: videoId)
     }
 
     /// Fetches player data using current yt-dlp's primary JS-less visionOS client.
@@ -159,7 +159,7 @@ extension InnerTubeAPI {
             "contentPlaybackContext": ["html5Preference": "HTML5_PREF_WANTS"]
         ]
         let data = try await postVisionOS(body: body)
-        return try parsePlayerInfo(from: data, videoId: videoId)
+        return try await parsePlayerInfo(from: data, videoId: videoId)
     }
 
     /// Fetches player info using the WEB_EMBEDDED_PLAYER client (nameID=56).
@@ -183,14 +183,14 @@ extension InnerTubeAPI {
         var comps = URLComponents(string: "https://www.youtube.com/watch")!
         comps.queryItems = [URLQueryItem(name: "v", value: videoId)]
         let referer = comps.url?.absoluteString ?? "https://www.youtube.com"
-        body["playbackContext"] = [
-            "contentPlaybackContext": [
-                "referer": referer,
-                "html5Preference": "HTML5_PREF_WANTS",
-            ]
+        var cpbc: [String: Any] = [
+            "referer": referer,
+            "html5Preference": "HTML5_PREF_WANTS",
         ]
+        if let sts = await fetchSignatureTimestampIfNeeded() { cpbc["signatureTimestamp"] = sts }
+        body["playbackContext"] = ["contentPlaybackContext": cpbc]
         let data = try await postTVEmbedded(body: body)
-        return try parsePlayerInfo(from: data, videoId: videoId)
+        return try await parsePlayerInfo(from: data, videoId: videoId, usesJSPlayer: true)
     }
 
     /// Fetches player info using the WEB client with macOS Safari UA (yt-dlp `web_safari`).
@@ -207,7 +207,7 @@ extension InnerTubeAPI {
         body["videoId"] = videoId
         body["playbackContext"] = ["contentPlaybackContext": cpbc]
         let data = try await postWebSafari(body: body)
-        return try parsePlayerInfo(from: data, videoId: videoId)
+        return try await parsePlayerInfo(from: data, videoId: videoId, usesJSPlayer: true)
     }
 
     /// Fetches player info using the MWEB (m.youtube.com, iPad Safari) client.    /// Per yt-dlp, MWEB does not require a PO Token for HLS (`required=False`) and has
@@ -231,7 +231,7 @@ extension InnerTubeAPI {
         body["playbackContext"] = ["contentPlaybackContext": cpbc]
 
         let data = try await postMWEB(body: body)
-        return try parsePlayerInfo(from: data, videoId: videoId)
+        return try await parsePlayerInfo(from: data, videoId: videoId, usesJSPlayer: true)
     }
 
     /// Fetches player info using the WEB_CREATOR (YouTube Studio) client.
@@ -257,7 +257,7 @@ extension InnerTubeAPI {
         body["contentCheckOk"] = true
         body["playbackContext"] = ["contentPlaybackContext": cpbc]
         let data = try await postWebCreator(body: body)
-        return try parsePlayerInfo(from: data, videoId: videoId)
+        return try await parsePlayerInfo(from: data, videoId: videoId, usesJSPlayer: true)
     }
 
     /// Fetches player info using the authenticated WEB client (nameID=1, www.youtube.com).
@@ -277,7 +277,7 @@ extension InnerTubeAPI {
         body["contentCheckOk"] = true
         body["playbackContext"] = ["contentPlaybackContext": cpbc]
         let data = try await postWebAuthenticated(body: body)
-        return try parsePlayerInfo(from: data, videoId: videoId)
+        return try await parsePlayerInfo(from: data, videoId: videoId, usesJSPlayer: true)
     }
 
     /// Fetches player info using the authenticated iOS client.
@@ -291,7 +291,7 @@ extension InnerTubeAPI {
         body["racyCheckOk"] = true
         body["contentCheckOk"] = true
         let data = try await postPlayerAuthenticated(body: body)
-        var info = try parsePlayerInfo(from: data, videoId: videoId)
+        var info = try await parsePlayerInfo(from: data, videoId: videoId)
         if let pot = poToken, poTokenVideoId == videoId {
             tubeLog.notice(
                 "[InnerTube] ✅ poToken applied to \(videoId, privacy: .public) via iOS-auth client (len=\(pot.count))")
@@ -398,10 +398,10 @@ extension InnerTubeAPI {
             var retryFields = (tvClientContext["client"] as? [String: Any]) ?? [:]
             retryFields["visitorData"] = newVD
             let retryData = try await postTV(endpoint: "player", body: buildBody(fields: retryFields))
-            return try parsePlayerInfo(from: retryData, videoId: videoId)
+            return try await parsePlayerInfo(from: retryData, videoId: videoId, usesJSPlayer: true)
         }
 
-        return try parsePlayerInfo(from: firstData, videoId: videoId)
+        return try await parsePlayerInfo(from: firstData, videoId: videoId, usesJSPlayer: true)
     }
 
     /// Fetches end-screen cards for a video using the Web client.
@@ -623,7 +623,13 @@ extension InnerTubeAPI {
 
     // MARK: - Private player helpers
 
-    private func parsePlayerInfo(from json: [String: Any], videoId: String) throws -> PlayerInfo {
+    /// - Parameter usesJSPlayer: true for clients that rely on the web player JS (WEB, MWEB,
+    ///   WEB_EMBEDDED, WEB_CREATOR, TVHTML5). Their adaptive URLs carry an `n` that must be
+    ///   transformed; JS-less clients (iOS, Android, VR, visionOS) must be left untouched.
+    ///   `signatureCipher` formats are deciphered regardless of this flag.
+    private func parsePlayerInfo(
+        from json: [String: Any], videoId: String, usesJSPlayer: Bool = false
+    ) async throws -> PlayerInfo {
         let videoDetails = json["videoDetails"] as? [String: Any]
         let title = videoDetails?["title"] as? String ?? ""
         let channelTitle = videoDetails?["author"] as? String ?? ""
@@ -632,6 +638,15 @@ extension InnerTubeAPI {
         let duration = durationStr.flatMap { Double($0) }
         let isLive = videoDetails?["isLiveContent"] as? Bool ?? false
         let viewCount = (videoDetails?["viewCount"] as? String).flatMap { Int($0) }
+        let channelId = videoDetails?["channelId"] as? String
+        let category =
+            ((json["microformat"] as? [String: Any])?["playerMicroformatRenderer"] as? [String: Any])?["category"]
+            as? String
+        let isMusic = PlayerInfo.looksLikeMusic(
+            musicVideoType: videoDetails?["musicVideoType"] as? String,
+            category: category,
+            channelTitle: channelTitle,
+            title: title)
         let thumbURL = ((videoDetails?["thumbnail"] as? [String: Any])?["thumbnails"] as? [[String: Any]])?
             .last.flatMap { $0["url"] as? String }.flatMap { URL(string: $0) }
 
@@ -676,11 +691,27 @@ extension InnerTubeAPI {
         }
         var formats: [VideoFormat] = []
 
+        // Solve player-JS challenges (n throttling param + signatureCipher) in one batch.
+        let rawAllFormats =
+            (streamingData?["formats"] as? [[String: Any]] ?? [])
+            + (streamingData?["adaptiveFormats"] as? [[String: Any]] ?? [])
+        let challenges = StreamURLRewriter.challenges(in: rawAllFormats, includeN: usesJSPlayer)
+        var solutions = StreamChallengeSolutions.empty
+        if !challenges.isEmpty {
+            if let decipherer = StreamURLDecipherRegistry.current {
+                solutions = await decipherer.solve(n: challenges.n, sig: challenges.sig)
+                tubeLog.notice(
+                    "parsePlayerInfo id=\(videoId, privacy: .public) decipher n=\(solutions.n.count, privacy: .public)/\(challenges.n.count, privacy: .public) sig=\(solutions.sig.count, privacy: .public)/\(challenges.sig.count, privacy: .public)"
+                )
+            } else {
+                tubeLog.notice("parsePlayerInfo: \(challenges.sig.count) ciphered formats but no decipherer registered")
+            }
+        }
+
         func parseFormats(_ raw: [[String: Any]]) -> [VideoFormat] {
             raw.compactMap { f -> VideoFormat? in
                 guard f["itag"] is Int else { return nil }
-                let urlStr = f["url"] as? String
-                let url = urlStr.flatMap { URL(string: $0) }
+                let url = StreamURLRewriter.resolvedURL(for: f, solutions: solutions, includeN: usesJSPlayer)
                 let quality = f["qualityLabel"] as? String ?? f["quality"] as? String ?? "unknown"
                 let mimeType = f["mimeType"] as? String ?? ""
                 let width = f["width"] as? Int ?? 0
@@ -797,6 +828,7 @@ extension InnerTubeAPI {
             id: videoId,
             title: title,
             channelTitle: channelTitle,
+            channelId: channelId,
             description: description,
             thumbnailURL: thumbURL,
             duration: duration,
@@ -807,20 +839,24 @@ extension InnerTubeAPI {
         guard hlsURL != nil || !formats.isEmpty else {
             throw APIError.unavailable("This video is unavailable")
         }
-        // If streamingData is present but every format URL is nil, the server returned
-        // cipher-protected URLs that we cannot decode (signatureCipher / cipher fields).
-        // Treat this as unavailable so the caller's fallback chain (Android client) fires
-        // rather than surfacing a confusing "No stream URL" decoding error.
+        // streamingData present but no usable URL: either SABR-only (serverAbrStreamingUrl,
+        // e.g. the iOS client as of Nov 2026) or ciphers the decipherer could not solve.
+        // The video is fine — throw the dedicated reason so callers fall back to other clients.
         let hasAnyURL = hlsURL != nil || formats.contains { $0.url != nil }
         if !hasAnyURL {
-            tubeLog.error("❌ parsePlayerInfo: streamingData present but all format URLs are nil (cipher-protected?)")
-            throw APIError.unavailable("Stream URLs require decryption — not supported by this client")
+            let sabrOnly = streamingData?["serverAbrStreamingUrl"] != nil
+            tubeLog.error(
+                "❌ parsePlayerInfo id=\(videoId, privacy: .public): no playable URLs (sabrOnly=\(sabrOnly, privacy: .public) ciphered=\(challenges.sig.count, privacy: .public))"
+            )
+            throw APIError.unavailable(APIError.noPlayableURLsReason)
         }
         let endCards = parseEndCards(from: json)
         tubeLog.notice("parsePlayerInfo: endCards=\(endCards.count, privacy: .public)")
         return PlayerInfo(
             video: video, formats: formats, hlsURL: hlsURL, dashURL: dashURL, captionTracks: captionTracks,
-            trackingURLs: trackingURLs, endCards: endCards)
+            trackingURLs: trackingURLs, endCards: endCards,
+            hlsRequiresNTransform: usesJSPlayer && hlsURL != nil,
+            isMusic: isMusic)
     }
 
     // MARK: – End cards parser

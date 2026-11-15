@@ -96,6 +96,14 @@ extension InnerTubeAPI {
         {
             return sts
         }
+        // Prefer the STS of the player JS the decipherer loaded: signatureCipher values
+        // only decode with the player version whose STS was sent in the request.
+        if let decipherer = StreamURLDecipherRegistry.current, let sts = await decipherer.signatureTimestamp() {
+            signatureTimestamp = sts
+            signatureTimestampFetchedAt = Date()
+            tubeLog.notice("signatureTimestamp (STS) from decipherer player JS: \(sts, privacy: .public)")
+            return sts
+        }
         guard let url = URL(string: "https://www.youtube.com/") else { return nil }
         do {
             let (data, _) = try await session.data(from: url)

@@ -98,6 +98,33 @@ public struct PlayerInfo: Sendable {
     /// Empty when the iOS client is used for primary streaming — a fallback web-client
     /// fetch is performed in PlaybackViewModel when this is empty.
     public let endCards: [EndCard]
+    /// True when `hlsURL` came from a JS-player client (WEB, MWEB, embedded, TV): its
+    /// playlists carry a scrambled `/n/…/` that must be solved or segments return 403.
+    /// HLS from JS-less clients (iOS, visionOS, Android VR) must be left untouched.
+    public var hlsRequiresNTransform: Bool = false
+    /// Music video / song (YouTube `musicVideoType`, category "Music", Topic or VEVO channel).
+    /// Playback speed is never remembered for music.
+    public var isMusic: Bool = false
+
+    /// Heuristic used by `parsePlayerInfo` to flag music. Pure, so it is unit-testable.
+    public static func looksLikeMusic(
+        musicVideoType: String?, category: String?, channelTitle: String, title: String = ""
+    ) -> Bool {
+        if let type = musicVideoType, !type.isEmpty { return true }
+        if category?.caseInsensitiveCompare("Music") == .orderedSame { return true }
+        if channelTitle.hasSuffix(" - Topic") { return true }
+        if channelTitle.uppercased().hasSuffix("VEVO") { return true }
+        // JS-less clients (visionOS, iOS) omit musicVideoType/category for many uploads,
+        // e.g. lyric channels — fall back to the standard music upload tags in the title.
+        let lowered = title.lowercased()
+        return musicTitleTags.contains { lowered.contains($0) }
+    }
+
+    static let musicTitleTags = [
+        "(official music video)", "[official music video]", "(official video)", "[official video]",
+        "(official audio)", "[official audio]", "(official lyric video)", "(lyric video)", "[lyric video]",
+        "(lyrics)", "[lyrics]", "(audio)", "[audio]", "(visualizer)", "[visualizer]", "(official visualizer)",
+    ]
 
     /// The best stream URL to hand to AVPlayer.
     /// Prefers HLS (works natively in AVPlayer on iOS, handles adaptive quality).
@@ -204,7 +231,9 @@ public struct PlayerInfo: Sendable {
             dashURL: append(dashURL),
             captionTracks: captionTracks,
             trackingURLs: trackingURLs,
-            endCards: endCards
+            endCards: endCards,
+            hlsRequiresNTransform: hlsRequiresNTransform,
+            isMusic: isMusic
         )
     }
 
@@ -228,7 +257,8 @@ public struct PlayerInfo: Sendable {
             dashURL: nil,
             captionTracks: captionTracks,
             trackingURLs: trackingURLs,
-            endCards: endCards
+            endCards: endCards,
+            isMusic: isMusic
         )
     }
 }
@@ -249,6 +279,17 @@ public enum APIError: LocalizedError {
     /// before it can be played. Unlike `unavailable`, retrying with the same credentials
     /// will not succeed — the user must authenticate first.
     case signInRequired
+
+    /// `unavailable` reason used when a player response has `streamingData` but no usable
+    /// URL — SABR-only (`serverAbrStreamingUrl`) or ciphers that could not be deciphered.
+    /// The video itself is fine; another client usually returns playable URLs.
+    public static let noPlayableURLsReason = "This client returned no playable stream URLs"
+
+    /// True for the "no playable URLs from this client" case (see `noPlayableURLsReason`).
+    public var isNoPlayableURLs: Bool {
+        if case .unavailable(let reason) = self { return reason == Self.noPlayableURLsReason }
+        return false
+    }
 
     public var errorDescription: String? {
         switch self {

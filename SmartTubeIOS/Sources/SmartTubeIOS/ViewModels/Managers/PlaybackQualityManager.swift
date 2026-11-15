@@ -91,6 +91,8 @@ final class PlaybackQualityManager {
     private var hlsPlaybackUserAgent = InnerTubeClients.Web.userAgent
     private var hlsPlaybackMaximumHeight: Int? = nil
     private var hlsRequiredVideoCodec: String? = nil
+    /// True when the current HLS came from a JS-player client and its `/n/` must be solved.
+    private var hlsSolvesNChallenges = false
     @ObservationIgnored private var nativeHLSProxyLoader: YTHLSProxyLoader? = nil
     /// `true` when the current stream is a muxed (360p) fallback.
     /// Quality-switch attempts while muxed trigger fresh WKWebView extraction
@@ -145,6 +147,7 @@ final class PlaybackQualityManager {
         hlsPlaybackUserAgent = InnerTubeClients.Web.userAgent
         hlsPlaybackMaximumHeight = nil
         hlsRequiredVideoCodec = nil
+        hlsSolvesNChallenges = false
         nativeHLSProxyLoader = nil
         isMuxedFallback = false
         hasAppliedH264Cap = false
@@ -316,26 +319,28 @@ final class PlaybackQualityManager {
     func configureHLSPlayback(
         userAgent: String,
         maximumHeight: Int?,
-        requiredVideoCodec: String?
+        requiredVideoCodec: String?,
+        solvesNChallenges: Bool = false
     ) {
         hlsPlaybackUserAgent = userAgent
         hlsPlaybackMaximumHeight = maximumHeight
         hlsRequiredVideoCodec = requiredVideoCodec
+        hlsSolvesNChallenges = solvesNChallenges
         nativeHLSProxyLoader = nil
     }
 
     func makeHLSAsset(url: URL, options: [String: Any]) -> AVURLAsset {
-        guard let requiredVideoCodec = hlsRequiredVideoCodec,
-            let maximumVideoHeight = hlsPlaybackMaximumHeight,
-            let proxyURL = url.proxyURL
-        else {
+        // Proxy when the master needs codec/height filtering or n-challenge solving.
+        let filters = hlsRequiredVideoCodec != nil && hlsPlaybackMaximumHeight != nil
+        guard filters || hlsSolvesNChallenges, let proxyURL = url.proxyURL else {
             nativeHLSProxyLoader = nil
             return AVURLAsset(url: url, options: options)
         }
         let loader = YTHLSProxyLoader(
             ua: hlsPlaybackUserAgent,
-            maximumVideoHeight: maximumVideoHeight,
-            requiredVideoCodec: requiredVideoCodec
+            maximumVideoHeight: filters ? hlsPlaybackMaximumHeight : nil,
+            requiredVideoCodec: filters ? hlsRequiredVideoCodec : nil,
+            solvesNChallenges: hlsSolvesNChallenges
         )
         let asset = AVURLAsset(url: proxyURL, options: options)
         asset.resourceLoader.setDelegate(loader, queue: .global(qos: .userInitiated))

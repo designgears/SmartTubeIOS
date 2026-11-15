@@ -17,6 +17,8 @@ struct SmartTubeApp: App {
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
+        // On-device n / signatureCipher solver (JavaScriptCore + yt-dlp EJS); works on tvOS.
+        YouTubeJSSolver.install()
         let api = InnerTubeAPI()
         _api = State(initialValue: api)
         _authService = State(initialValue: AuthService())

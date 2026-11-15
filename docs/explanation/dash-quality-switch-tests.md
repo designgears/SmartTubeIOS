@@ -3,6 +3,7 @@
 # HLS Quality / testAutoQualityAbove360p
 
 ## Passing fix (2026-05-23)
+> Superseded 2026-11-15: `YouTubeNDescrambler` and the simulator yt-dlp path were removed; n is now solved on-device on all platforms — see [hls-n-descrambler.md](hls-n-descrambler.md).
 - `testAutoQualityAbove360p` (videoId: `Wu8xNx4njoM`, minimumHeight: 720) — PASSES 3/3
 - Fix: in `#if targetEnvironment(simulator)` block inside `attemptURL`, call `YouTubeNDescrambler.ytDlpHLSVariantURL(videoId:)` FIRST to get a pre-descrambled 720p/1080p HLS variant URL from yt-dlp; only fall back to the JS-solver proxy if yt-dlp unavailable.
 - Root cause of failure: iOS Simulator URLSession routes CDN segment requests differently (likely IPv6 vs IPv4) from how yt-dlp/Python makes requests. `ip/x.x.x.x/` baked into segment URLs embeds the InnerTube API caller's IP; segment requests from the simulator may arrive from a different IP → CDN 403. yt-dlp's API call + segment requests share the same Mac IP → 200.

@@ -33,6 +33,8 @@ struct SmartTubeTVApp: App {
             }
             return BotGuardClient()
         }()
+        // On-device n / signatureCipher solver (JavaScriptCore + yt-dlp EJS); works on tvOS.
+        YouTubeJSSolver.install()
         let api = InnerTubeAPI(authToken: nil, poTokenProvider: poTokenProvider)
         _api = State(initialValue: api)
         _authService = State(initialValue: AuthService())

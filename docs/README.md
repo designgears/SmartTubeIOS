@@ -16,7 +16,7 @@ undiscoverable until it is. Keep this under 100 lines; anything that doesn't fit
 | [explanation/swift-style.md](explanation/swift-style.md) | Swift style guide (moved from private repo) | current | 2026-09-11 |
 | [explanation/solid.md](explanation/solid.md) | SOLID principles reference (moved from private repo) | current | 2026-09-11 |
 | [explanation/home-feed-architecture.md](explanation/home-feed-architecture.md) | Home feed / Shorts detection notes | unverified | 2026-09-11 |
-| [explanation/hls-n-descrambler.md](explanation/hls-n-descrambler.md) | HLS n-parameter descrambling notes | unverified | 2026-09-11 |
+| [explanation/hls-n-descrambler.md](explanation/hls-n-descrambler.md) | On-device n / signatureCipher deciphering (JavaScriptCore) | verified | 2026-11-15 |
 | [explanation/dash-quality-switch-tests.md](explanation/dash-quality-switch-tests.md) | DASH quality-switch test notes | unverified | 2026-09-11 |
 | [explanation/no-botguard.md](explanation/no-botguard.md) | Notes on avoiding BotGuard | unverified | 2026-09-11 |
 | [explanation/reviewer-notes.md](explanation/reviewer-notes.md) | Code reviewer notes | unverified | 2026-09-11 |

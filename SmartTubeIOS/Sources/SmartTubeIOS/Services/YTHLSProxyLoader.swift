@@ -62,6 +62,11 @@ final class YTHLSProxyLoader: NSObject, AVAssetResourceLoaderDelegate, @unchecke
     /// Optional compatibility filter applied to master manifests before URI rewriting.
     let maximumVideoHeight: Int?
     let requiredVideoCodec: String?
+    /// When true, the `/n/…/` in every *media* playlist (segment list) is solved on the fly
+    /// with `YouTubeJSSolver` (JS-player-client HLS: WEB, MWEB, embedded, TV). The master is
+    /// left untouched: the manifest server echoes whatever n it receives into segment URLs,
+    /// so media playlists always carry the original challenge and are solved exactly once.
+    let solvesNChallenges: Bool
     private let lock = NSLock()
     private var activeTasks: [ObjectIdentifier: URLSessionDataTask] = [:]
 
@@ -69,9 +74,10 @@ final class YTHLSProxyLoader: NSObject, AVAssetResourceLoaderDelegate, @unchecke
         ua: String, nSolver: (unsolved: String, solved: String)? = nil,
         webViewCookies: [HTTPCookie] = [], selectedLanguageContentID: String? = nil,
         poToken: String? = nil, maximumVideoHeight: Int? = nil,
-        requiredVideoCodec: String? = nil
+        requiredVideoCodec: String? = nil, solvesNChallenges: Bool = false
     ) {
         self.ua = ua
+        self.solvesNChallenges = solvesNChallenges
         self.nSolver = nSolver
         self.webViewCookies = webViewCookies
         self.selectedLanguageContentID = selectedLanguageContentID
@@ -162,38 +168,25 @@ final class YTHLSProxyLoader: NSObject, AVAssetResourceLoaderDelegate, @unchecke
                 "[HLSProxy] Content-Type=\(httpResp.value(forHTTPHeaderField: "Content-Type") ?? "nil") isPlaylist=\(isPlaylist)"
             )
 
-            // For HLS playlists, rewrite segment/sub-playlist URIs to our proxy scheme.
-            var responseData = data
-            if isPlaylist {
-                if let text = String(data: data, encoding: .utf8) {
-                    let rewritten = self.rewritePlaylist(text, baseURL: realURL)
-                    responseData = rewritten.data(using: .utf8) ?? data
+            // JS-player-client HLS: solve the scrambled n in media playlists (segment lists).
+            if isPlaylist, self.solvesNChallenges, let text = String(data: data, encoding: .utf8),
+                !(text.contains("#EXT-X-STREAM-INF") || text.contains("#EXT-X-MEDIA:"))
+            {
+                let pending = StreamURLRewriter.hlsNChallenges(in: text)
+                if !pending.isEmpty {
+                    Task {
+                        let solved = await YouTubeJSSolver.shared.solve(n: pending, sig: []).n
+                        proxyLog.notice("[HLSProxy] solved \(solved.count)/\(pending.count) segment n value(s)")
+                        let patched = StreamURLRewriter.replacingHLSN(in: text, solutions: solved)
+                        self.finish(
+                            loadingRequest, data: Data(patched.utf8), realURL: realURL,
+                            isPlaylist: true, mimeTypeLower: mimeTypeLower)
+                    }
+                    return
                 }
             }
-
-            // Populate content information AFTER computing responseData so contentLength is accurate.
-            // AVAssetResourceLoadingContentInformationRequest.contentType requires a UTI string
-            // (Uniform Type Identifier), NOT a raw MIME type. Supplying a MIME type causes
-            // AVFoundation to misidentify the resource and fail with CoreMediaErrorDomain -12881.
-            if let infoReq = loadingRequest.contentInformationRequest {
-                let uti: String
-                if isPlaylist {
-                    uti = "public.m3u-playlist"
-                } else if mimeTypeLower.contains("mp4") || mimeTypeLower.contains("mpeg-4") {
-                    // fMP4 segments (YouTube uses video/mp4 for fragmented MP4 HLS)
-                    uti = "public.mpeg-4"
-                } else {
-                    // Default: MPEG-2 TS (video/MP2T)
-                    uti = "public.mpeg-2-transport-stream"
-                }
-                infoReq.contentType = uti
-                infoReq.contentLength = Int64(responseData.count)
-                infoReq.isByteRangeAccessSupported = false
-                proxyLog.notice("[HLSProxy] contentInfo: UTI=\(uti) length=\(responseData.count)")
-            }
-
-            loadingRequest.dataRequest?.respond(with: responseData)
-            loadingRequest.finishLoading()
+            self.finish(
+                loadingRequest, data: data, realURL: realURL, isPlaylist: isPlaylist, mimeTypeLower: mimeTypeLower)
         }
 
         lock.lock()
@@ -201,6 +194,45 @@ final class YTHLSProxyLoader: NSObject, AVAssetResourceLoaderDelegate, @unchecke
         lock.unlock()
         task.resume()
         return true
+    }
+
+    /// Rewrites playlists (proxy scheme, filters, pot=) and answers the loading request.
+    private func finish(
+        _ loadingRequest: AVAssetResourceLoadingRequest, data: Data, realURL: URL,
+        isPlaylist: Bool, mimeTypeLower: String
+    ) {
+        // For HLS playlists, rewrite segment/sub-playlist URIs to our proxy scheme.
+        var responseData = data
+        if isPlaylist {
+            if let text = String(data: data, encoding: .utf8) {
+                let rewritten = self.rewritePlaylist(text, baseURL: realURL)
+                responseData = rewritten.data(using: .utf8) ?? data
+            }
+        }
+
+        // Populate content information AFTER computing responseData so contentLength is accurate.
+        // AVAssetResourceLoadingContentInformationRequest.contentType requires a UTI string
+        // (Uniform Type Identifier), NOT a raw MIME type. Supplying a MIME type causes
+        // AVFoundation to misidentify the resource and fail with CoreMediaErrorDomain -12881.
+        if let infoReq = loadingRequest.contentInformationRequest {
+            let uti: String
+            if isPlaylist {
+                uti = "public.m3u-playlist"
+            } else if mimeTypeLower.contains("mp4") || mimeTypeLower.contains("mpeg-4") {
+                // fMP4 segments (YouTube uses video/mp4 for fragmented MP4 HLS)
+                uti = "public.mpeg-4"
+            } else {
+                // Default: MPEG-2 TS (video/MP2T)
+                uti = "public.mpeg-2-transport-stream"
+            }
+            infoReq.contentType = uti
+            infoReq.contentLength = Int64(responseData.count)
+            infoReq.isByteRangeAccessSupported = false
+            proxyLog.notice("[HLSProxy] contentInfo: UTI=\(uti) length=\(responseData.count)")
+        }
+
+        loadingRequest.dataRequest?.respond(with: responseData)
+        loadingRequest.finishLoading()
     }
 
     func resourceLoader(
