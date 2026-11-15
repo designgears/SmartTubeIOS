@@ -115,7 +115,8 @@ struct TVHomeView: View {
             }
             guard playerWasOpen else { return }
             playerWasOpen = false
-            historyVM?.reload(section: BrowseSection(type: .history))
+            // In place: Continue Watching keeps its cards until the refreshed list arrives.
+            historyVM?.refreshInPlace()
         }
         .task(id: historyVM?.videoGroups.flatMap(\.videos).map(\.id) ?? []) {
             var fractions: [String: Double] = [:]

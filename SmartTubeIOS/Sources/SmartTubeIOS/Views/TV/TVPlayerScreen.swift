@@ -21,7 +21,7 @@ struct TVPlayerScreen: View {
     @Environment(TVNavigator.self) private var navigator
     @Environment(\.scenePhase) private var scenePhase
     @State private var vm: PlaybackViewModel?
-    @State private var transportBar = TVTransportBarState()
+    @State private var transportBar = TVPlayerPresentationState()
 
     var body: some View {
         ZStack {
@@ -35,7 +35,9 @@ struct TVPlayerScreen: View {
                 .ignoresSafeArea()
                 TVSponsorSegmentsTrack(
                     segments: vm.sponsorSegments, duration: vm.duration, isVisible: transportBar.isVisible)
-                TVPlayerOverlays(vm: vm, video: video) { navigator.nowPlaying = nil }
+                TVPlayerOverlays(vm: vm, video: video, isVideoOnScreen: transportBar.isVideoOnScreen) {
+                    navigator.nowPlaying = nil
+                }
             }
         }
         .onAppear(perform: start)
@@ -166,7 +168,7 @@ struct TVNativePlayer: UIViewControllerRepresentable {
     /// Settings › Video Fit: crop to fill instead of letterboxing.
     var fillsScreen = false
     /// Mirrors the native transport bar's visibility (for overlays drawn on top of it).
-    var transportBar: TVTransportBarState?
+    var transportBar: TVPlayerPresentationState?
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -199,12 +201,20 @@ struct TVNativePlayer: UIViewControllerRepresentable {
     @MainActor
     final class Coordinator: NSObject, AVPlayerViewControllerDelegate, UIGestureRecognizerDelegate {
         var actions: TVPlayerActions?
-        var transportBar: TVTransportBarState?
+        var transportBar: TVPlayerPresentationState?
         private weak var pvc: AVPlayerViewController?
         private weak var vm: PlaybackViewModel?
         private var fallbackVideo: Video?
         private var lastState: TVPlayerMenuState?
         private var itemObservation: NSKeyValueObservation?
+        private var readyObservation: NSKeyValueObservation?
+        private var playingObservation: NSKeyValueObservation?
+        /// The current video has been shown; stays set through later buffering pauses.
+        private var videoShown = false
+        /// Which video `videoShown` is for: a quality change or retry replaces the item of the
+        /// same video and must not bring the backdrop back.
+        private var shownVideoId: String?
+        private var pausedStartFallback: Task<Void, Never>?
         private var artworkTask: Task<Void, Never>?
         private var panelsShowChapters: Bool?
         private var transportBarSafetyHide: Task<Void, Never>?
@@ -219,10 +229,58 @@ struct TVNativePlayer: UIViewControllerRepresentable {
             self.vm = vm
             self.fallbackVideo = fallbackVideo
             self.actions = actions
-            itemObservation = vm.player.observe(\.currentItem, options: [.initial, .new]) { [weak self] _, _ in
-                Task { @MainActor in self?.applyMetadata() }
+            itemObservation = vm.player.observe(\.currentItem, options: [.initial, .new]) { [weak self] player, _ in
+                let hasItem = player.currentItem != nil
+                Task { @MainActor in
+                    self?.applyMetadata()
+                    // A new video (autoplay, Up Next): back to the loading backdrop until it shows.
+                    if hasItem { self?.videoWillChange() }
+                }
             }
             installInteractionRecognizers(on: pvc.view)
+            readyObservation = pvc.observe(\.isReadyForDisplay, options: [.initial, .new]) { [weak self] _, _ in
+                Task { @MainActor in self?.refreshVideoOnScreen() }
+            }
+            playingObservation = vm.player.observe(\.timeControlStatus, options: [.new]) { [weak self] _, _ in
+                Task { @MainActor in self?.refreshVideoOnScreen() }
+            }
+        }
+
+        // MARK: Loading backdrop
+
+        /// The backdrop leaves once the picture is on screen *and* playing — a ready first frame
+        /// alone can be the frame before a resume seek. A video that starts paused still clears
+        /// it shortly after its first frame.
+        private func refreshVideoOnScreen() {
+            guard let pvc, let vm else { return }
+            if !videoShown, pvc.isReadyForDisplay {
+                if vm.player.timeControlStatus == .playing {
+                    videoShown = true
+                    shownVideoId = vm.currentVideo?.id
+                } else if pausedStartFallback == nil {
+                    pausedStartFallback = Task { [weak self] in
+                        try? await Task.sleep(for: .seconds(2))
+                        guard !Task.isCancelled, let self, self.pvc?.isReadyForDisplay == true else { return }
+                        self.videoShown = true
+                        self.shownVideoId = self.vm?.currentVideo?.id
+                        self.publishVideoOnScreen()
+                    }
+                }
+            }
+            publishVideoOnScreen()
+        }
+
+        private func videoWillChange() {
+            guard vm?.currentVideo?.id != shownVideoId else { return }
+            videoShown = false
+            pausedStartFallback?.cancel()
+            pausedStartFallback = nil
+            refreshVideoOnScreen()
+        }
+
+        private func publishVideoOnScreen() {
+            guard transportBar?.isVideoOnScreen != videoShown else { return }
+            withAnimation(.easeOut(duration: 0.3)) { transportBar?.isVideoOnScreen = videoShown }
         }
 
         // MARK: Transport-bar visibility
@@ -281,22 +339,38 @@ struct TVNativePlayer: UIViewControllerRepresentable {
         func detach() {
             itemObservation?.invalidate()
             itemObservation = nil
+            readyObservation?.invalidate()
+            readyObservation = nil
+            playingObservation?.invalidate()
+            playingObservation = nil
+            pausedStartFallback?.cancel()
             artworkTask?.cancel()
             transportBarSafetyHide?.cancel()
         }
 
         func apply(state: TVPlayerMenuState) {
             guard let pvc, state != lastState else { return }
+            let previous = lastState
             lastState = state
-            pvc.transportBarCustomMenuItems = menus(for: state)
-            if let label = state.skipLabel {
-                pvc.contextualActions = [
-                    UIAction(title: label, image: UIImage(systemName: AppSymbol.nextTrack)) { [weak self] _ in
-                        self?.actions?.skipSegment()
-                    }
-                ]
-            } else {
-                pvc.contextualActions = []
+            // Replacing the menus closes or resets one that is open, so only rebuild them when
+            // something they show changed — not when the SponsorBlock skip button comes and goes.
+            var menuState = state
+            menuState.skipLabel = nil
+            var previousMenuState = previous
+            previousMenuState?.skipLabel = nil
+            if menuState != previousMenuState {
+                pvc.transportBarCustomMenuItems = menus(for: state)
+            }
+            if state.skipLabel != previous?.skipLabel {
+                if let label = state.skipLabel {
+                    pvc.contextualActions = [
+                        UIAction(title: label, image: UIImage(systemName: AppSymbol.nextTrack)) { [weak self] _ in
+                            self?.actions?.skipSegment()
+                        }
+                    ]
+                } else {
+                    pvc.contextualActions = []
+                }
             }
             let showChapters = !state.chapters.isEmpty
             if panelsShowChapters != showChapters {
@@ -482,6 +556,7 @@ struct TVNativePlayer: UIViewControllerRepresentable {
 struct TVPlayerOverlays: View {
     let vm: PlaybackViewModel
     let video: Video
+    let isVideoOnScreen: Bool
     let onClose: () -> Void
 
     var body: some View {
@@ -493,8 +568,10 @@ struct TVPlayerOverlays: View {
                 }
                 .allowsHitTesting(false)
             }
-            if vm.error == nil, vm.isLoading, vm.currentTime < 0.5 {
-                loadingBackdrop.allowsHitTesting(false)
+            if vm.error == nil, !isVideoOnScreen {
+                loadingBackdrop
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
             }
             if let error = vm.error {
                 TVPlayerErrorPanel(
@@ -636,10 +713,15 @@ struct TVChaptersPanel: View {
 
 // MARK: - SponsorBlock segments on the scrubber
 
-/// Whether AVPlayerViewController's transport bar is on screen.
+/// What AVPlayerViewController is showing, for the SwiftUI layers drawn over it.
 @MainActor @Observable
-final class TVTransportBarState {
+final class TVPlayerPresentationState {
+    /// The transport bar is on screen.
     var isVisible = false
+    /// The video's first frame is on screen (`isReadyForDisplay`). Until then the loading
+    /// backdrop stays up, so there's no black frame with a second spinner between the
+    /// backdrop and the picture (e.g. while a resume position is being sought).
+    var isVideoOnScreen = false
 }
 
 /// Colours SponsorBlock segments onto the native scrubber while the transport bar is up.

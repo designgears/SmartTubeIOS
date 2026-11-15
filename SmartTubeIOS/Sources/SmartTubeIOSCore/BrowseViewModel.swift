@@ -184,6 +184,15 @@ public final class BrowseViewModel {
 
     /// Reloads the given section unconditionally, bypassing the same-section guard in `select`.
     /// Use this to retry a failed/empty fetch or to recover from an observation gap.
+    /// Refreshes the current section without emptying it first: what's on screen stays until
+    /// the new data replaces it, so a shelf doesn't vanish and reappear (e.g. Continue Watching
+    /// after closing the player).
+    public func refreshInPlace() {
+        fetchTask?.cancel()
+        let section = currentSection
+        fetchTask = Task { await fetchSection(section) }
+    }
+
     public func reload(section: BrowseSection) {
         browseLog.notice("reload: forcing refresh of \(section.title)")
         currentSection = section
