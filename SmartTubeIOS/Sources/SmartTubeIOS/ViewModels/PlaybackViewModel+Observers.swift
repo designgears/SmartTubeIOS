@@ -55,6 +55,14 @@ extension PlaybackViewModel {
         }
     }
 
+    /// Keeps the current position for a mid-playback reload (stall loop, failed item) so
+    /// the replacement stream resumes there; every load path seeks to
+    /// `savedPositionToRestore` on readyToPlay. Without this a reload restarted at 0:00.
+    func preservePositionForReload() {
+        let pos = currentTime
+        if pos > 0.5, !(duration > 0 && pos >= duration - 1) { savedPositionToRestore = pos }
+    }
+
     /// Calls `handlePlaybackEnd()` when `item` plays to its end.
     func observePlaybackEnd(of item: AVPlayerItem) {
         endObserverTask?.cancel()
@@ -167,6 +175,7 @@ extension PlaybackViewModel {
                                         "Stall loop \(recoveryCount)× in \(Int(elapsed))s — format unrecoverable, escalating"
                                 ]
                             )
+                            self.preservePositionForReload()
                             self.exhaustiveRetryTask = Task {
                                 await self.exhaustiveRetry(video: video, originalError: loopError)
                             }

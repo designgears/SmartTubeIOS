@@ -665,6 +665,7 @@ extension PlaybackViewModel {
                 // so asking it first only adds a round-trip. exhaustiveRetry starts with the
                 // visionOS client (H.264 HLS) and owns the rest of the fallback chain.
                 playerLog.notice("[tvOS] skipping iOS client — exhaustiveRetry (visionOS first)")
+                authTrackingTask?.cancel()  // phase 2 of the fallback path fetches its own
                 await exhaustiveRetry(video: video, originalError: nil, playerInfo: nil, cached: cached)
                 return
                 #else
@@ -1002,6 +1003,7 @@ extension PlaybackViewModel {
                         playerLog.error("❌ AVPlayerItem failed: \(err)")
                         if let video = self.currentVideo {
                             self.exhaustiveRetryTask?.cancel()
+                            self.preservePositionForReload()
                             self.exhaustiveRetryTask = Task {
                                 await self.exhaustiveRetry(video: video, originalError: item.error)
                             }
@@ -1494,7 +1496,16 @@ extension PlaybackViewModel {
             resolvedTrackingURLs = cachedTracking
             playerLog.notice("cache HIT: trackingURLs")
         } else {
-            resolvedTrackingURLs = await authTrackingTask?.value ?? info.trackingURLs
+            // Fallback paths (all of tvOS) start no parallel authenticated request, and their
+            // clients' own tracking URLs aren't account-bound, so the view would never reach
+            // watch history. Fetch the account-bound URLs here (returns nil when signed out).
+            let accountBound: PlaybackTrackingURLs?
+            if let authTrackingTask {
+                accountBound = await authTrackingTask.value
+            } else {
+                accountBound = await api.fetchAuthenticatedTrackingURLs(videoId: video.id)
+            }
+            resolvedTrackingURLs = accountBound ?? info.trackingURLs
             await VideoPreloadCache.shared.store(trackingURLs: resolvedTrackingURLs, for: video.id)
         }
         guard !Task.isCancelled else { return }
