@@ -16,8 +16,11 @@ extension InnerTubeAPI {
     /// Extracts `responseContext.visitorData` from a browse response and stores it.
     /// The stored token is included in subsequent home-feed requests so YouTube can
     /// tailor recommendations to this specific device/session.
-    func updateVisitorData(from response: [String: Any]) {
-        guard let ctx = response["responseContext"] as? [String: Any],
+    /// `epoch` is `accountEpoch` when the request was sent; a response from before an
+    /// account change is ignored.
+    func updateVisitorData(from response: [String: Any], epoch: Int) {
+        guard epoch == accountEpoch,
+            let ctx = response["responseContext"] as? [String: Any],
             let vd = ctx["visitorData"] as? String, !vd.isEmpty
         else { return }
         visitorData = vd
@@ -30,6 +33,7 @@ extension InnerTubeAPI {
     /// When unauthenticated, uses the WEB client on www.youtube.com for the default feed.
     public func fetchHome(continuationToken: String? = nil) async throws -> VideoGroup {
         let isAuth = authToken != nil
+        let epoch = accountEpoch
         var body = makeBody(
             client: isAuth ? tvClientContext : webClientContext,
             continuationToken: continuationToken,
@@ -41,7 +45,7 @@ extension InnerTubeAPI {
             isAuth
             ? try await postTV(endpoint: "browse", body: body)
             : try await post(endpoint: "browse", body: body)
-        updateVisitorData(from: data)
+        updateVisitorData(from: data, epoch: epoch)
         return try parseVideoGroup(from: data, title: BrowseSection.SectionType.home.defaultTitle)
     }
 
@@ -50,6 +54,7 @@ extension InnerTubeAPI {
     /// Falls back to a single flat VideoGroup if no shelves are found.
     public func fetchHomeRows(continuationToken: String? = nil) async throws -> [VideoGroup] {
         let isAuth = authToken != nil
+        let epoch = accountEpoch
         var body = makeBody(
             client: isAuth ? tvClientContext : webClientContext,
             continuationToken: continuationToken,
@@ -61,7 +66,7 @@ extension InnerTubeAPI {
             isAuth
             ? try await postTV(endpoint: "browse", body: body)
             : try await post(endpoint: "browse", body: body)
-        updateVisitorData(from: data)
+        updateVisitorData(from: data, epoch: epoch)
         let rows = parseVideoGroupRows(from: data)
         tubeLog.notice("fetchHomeRows → \(rows.count, privacy: .public) shelves")
         let rowShortsDetail = rows.map { row -> String in
@@ -409,8 +414,49 @@ extension InnerTubeAPI {
         return try await search(query: fallbackQuery)
     }
 
+    /// Music: YouTube's own "Top 100 Music Videos" chart for the region. The Music channel
+    /// page's video shelves are niche ("Artist On The Rise", "Live Performances"); the popular
+    /// material there is only offered as playlists/stations, so the chart playlist is used.
     public func fetchMusic() async throws -> VideoGroup {
-        try await fetchCategory("Music", channelId: CategoryChannel.music, fallbackQuery: "music")
+        if let chart = await musicChartPlaylist(),
+            let group = try? await fetchPlaylistVideos(playlistId: chart), !group.videos.isEmpty
+        {
+            return VideoGroup(title: "Music", videos: group.videos, nextPageToken: nil)
+        }
+        tubeLog.notice("fetchMusic: chart playlist unavailable — searching")
+        return try await search(query: "music")
+    }
+
+    /// Finds the "Top 100 Music Videos <region>" chart on the Music channel page (cached).
+    func musicChartPlaylist() async -> String? {
+        if let musicChartPlaylistId { return musicChartPlaylistId }
+        var body = makeBody(client: webClientContext)
+        body["browseId"] = CategoryChannel.music
+        guard let data = try? await post(endpoint: "browse", body: body) else { return nil }
+        var charts: [(id: String, title: String)] = []
+        func walk(_ node: Any) {
+            if let dict = node as? [String: Any] {
+                if let lockup = dict["lockupViewModel"] as? [String: Any],
+                    lockup["contentType"] as? String == "LOCKUP_CONTENT_TYPE_PLAYLIST",
+                    let id = lockup["contentId"] as? String,
+                    let title = ((lockup["metadata"] as? [String: Any])?["lockupMetadataViewModel"]
+                        as? [String: Any])?["title"] as? [String: Any],
+                    let text = title["content"] as? String
+                {
+                    charts.append((id, text))
+                }
+                dict.values.forEach(walk)
+            } else if let array = node as? [Any] {
+                array.forEach(walk)
+            }
+        }
+        walk(data)
+        // Prefer the regional chart (the page is localised by `gl`), then the global one.
+        let videoCharts = charts.filter { $0.title.hasPrefix("Top 100 Music Videos") }
+        let chosen = videoCharts.first { !$0.title.contains("Global") } ?? videoCharts.first
+        musicChartPlaylistId = chosen?.id
+        if let chosen { tubeLog.notice("fetchMusic: chart \(chosen.title, privacy: .public)") }
+        return chosen?.id
     }
 
     public func fetchGaming() async throws -> VideoGroup {

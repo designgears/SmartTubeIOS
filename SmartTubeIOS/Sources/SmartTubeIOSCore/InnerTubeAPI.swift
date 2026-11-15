@@ -26,6 +26,12 @@ public actor InnerTubeAPI {
     var visitorData: String?
     /// When the VisionOS watch-page session (cookies + visitorData) was last seeded.
     var visionOSSessionSeededAt: Date?
+    /// The region's "Top 100 Music Videos" chart playlist, found on YouTube's Music page.
+    var musicChartPlaylistId: String?
+    /// Bumped when the account changes. Responses to requests sent before the change must not
+    /// write session identity (visitorData) back — it would mix the previous account's
+    /// recommendation signals into the new account's feed.
+    var accountEpoch = 0
     var authToken: String?
     /// SAPISID cookie value from YouTube.com web session (set via OAuthLogin/MergeSession).
     /// Used by postWebCreator to compute SAPISIDHASH for WEB_CREATOR requests on www.youtube.com.
@@ -301,10 +307,14 @@ public actor InnerTubeAPI {
         pathMonitor.start(queue: .global(qos: .background))
         // Session identity (visitorData, the VisionOS watch-page session, PO tokens) belongs
         // to one account; drop it when the active account changes.
-        Task { [weak self] in
-            for await _ in NotificationCenter.default.notifications(named: AccountScope.didChangeNotification) {
-                guard let self else { return }
-                await self.resetAccountSessionState()
+        // Reset as the switch starts (before the new account's first requests) and again when
+        // it completes; late responses from before the switch are ignored via `accountEpoch`.
+        for name in [AccountScope.willChangeNotification, AccountScope.didChangeNotification] {
+            Task { [weak self] in
+                for await _ in NotificationCenter.default.notifications(named: name) {
+                    guard let self else { return }
+                    await self.resetAccountSessionState()
+                }
             }
         }
     }
@@ -359,6 +369,7 @@ public actor InnerTubeAPI {
     /// Forgets session identity tied to the previous account. Auth tokens, SAPISID and the
     /// Brand Account are set separately by AuthService when it switches.
     public func resetAccountSessionState() {
+        accountEpoch += 1
         visitorData = nil
         visionOSSessionSeededAt = nil
         poToken = nil

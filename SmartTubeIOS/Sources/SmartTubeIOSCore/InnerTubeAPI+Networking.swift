@@ -60,6 +60,7 @@ extension InnerTubeAPI {
     }
 
     func seedVisionOSSession(videoId: String) async {
+        let epoch = accountEpoch
         var components = URLComponents(string: "https://www.youtube.com/watch")!
         components.queryItems = [
             URLQueryItem(name: "v", value: videoId),
@@ -91,6 +92,7 @@ extension InnerTubeAPI {
         else { return }
 
         if let value = extractYouTubeVisitorData(from: html) {
+            guard epoch == accountEpoch else { return }  // account changed while fetching
             visitorData = value
             visionOSSessionSeededAt = Date()
             tubeLog.notice("VisionOS session seeded (visitorData len=\(value.count, privacy: .public))")

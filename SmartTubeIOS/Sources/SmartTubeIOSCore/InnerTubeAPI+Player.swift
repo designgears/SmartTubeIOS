@@ -347,6 +347,7 @@ extension InnerTubeAPI {
         // UNPLAYABLE even when the Bearer token is valid.
         var clientFields = (tvClientContext["client"] as? [String: Any]) ?? [:]
         let hadVisitorData = visitorData != nil
+        let epoch = accountEpoch
         if let vd = visitorData { clientFields["visitorData"] = vd }
 
         // signatureTimestamp (STS) validates the player JS version on YouTube's backend.
@@ -406,7 +407,7 @@ extension InnerTubeAPI {
         // On the very first call visitorData is nil, which causes YouTube to return no
         // streamingData. Extract and cache it here, then immediately retry so the quality
         // switch succeeds without waiting 60+ s for background browse calls to populate it.
-        if !hadVisitorData,
+        if !hadVisitorData, epoch == accountEpoch,
             let rc = firstData["responseContext"] as? [String: Any],
             let newVD = rc["visitorData"] as? String, !newVD.isEmpty
         {
