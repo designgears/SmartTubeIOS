@@ -40,6 +40,35 @@ extension PlaybackViewModel {
         }
     }
 
+    /// Watches `player.currentItem` so the end-of-video handler (autoplay next, queue,
+    /// loop) is attached to every item, whichever load path installed it. Several
+    /// fallback strategies replace the item without wiring `endObserverTask` themselves;
+    /// on tvOS every video plays through one of them, so videos just stopped at the end.
+    /// `endObserverTask` is a single slot (every assignment cancels the previous one),
+    /// so paths that do wire their own observer never end up with two.
+    func setupCurrentItemObserver() {
+        currentItemObserver = player.observe(\.currentItem, options: [.new]) { [weak self] _, _ in
+            Task { @MainActor [weak self] in
+                guard let self, let item = self.player.currentItem else { return }
+                self.observePlaybackEnd(of: item)
+            }
+        }
+    }
+
+    /// Calls `handlePlaybackEnd()` when `item` plays to its end.
+    func observePlaybackEnd(of item: AVPlayerItem) {
+        endObserverTask?.cancel()
+        endObserverTask = Task { [weak self, item] in
+            let notifications = NotificationCenter.default.notifications(
+                named: AVPlayerItem.didPlayToEndTimeNotification, object: item
+            )
+            for await _ in notifications {
+                guard let self, !Task.isCancelled else { return }
+                self.handlePlaybackEnd()
+            }
+        }
+    }
+
     func setupRateObserver() {
         // KVO on player.rate so isPlaying stays in sync when the system externally
         // pauses the player (e.g. headphones removed, audio session interruption ends

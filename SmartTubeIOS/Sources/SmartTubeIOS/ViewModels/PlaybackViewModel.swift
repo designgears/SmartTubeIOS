@@ -259,6 +259,8 @@ public final class PlaybackViewModel {
     @ObservationIgnored nonisolated(unsafe) var timeObserver: Any?
     @ObservationIgnored nonisolated(unsafe) var audioSessionObserver: Any?
     @ObservationIgnored nonisolated(unsafe) var rateObserver: NSKeyValueObservation?
+    /// Re-attaches the end-of-playback handler whenever any path installs a new item.
+    @ObservationIgnored nonisolated(unsafe) var currentItemObserver: NSKeyValueObservation?
     /// True while the video is being routed to an external display via AirPlay.
     public internal(set) var isAirPlaying: Bool = false
     @ObservationIgnored nonisolated(unsafe) var airPlayObserver: NSKeyValueObservation?
@@ -482,6 +484,7 @@ public final class PlaybackViewModel {
         #endif
         setupTimeObserver()
         setupRateObserver()
+        setupCurrentItemObserver()
         #if canImport(UIKit)
         setupRemoteCommandCenter()
         setupAudioSessionObserver()
@@ -504,6 +507,7 @@ public final class PlaybackViewModel {
     deinit {
         if let obs = timeObserver { player.removeTimeObserver(obs) }
         rateObserver?.invalidate()
+        currentItemObserver?.invalidate()
         airPlayObserver?.invalidate()
         if let obs = audioSessionObserver { NotificationCenter.default.removeObserver(obs) }
         #if canImport(UIKit)
