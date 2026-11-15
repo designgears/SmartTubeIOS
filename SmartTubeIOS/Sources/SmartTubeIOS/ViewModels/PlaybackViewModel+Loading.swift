@@ -626,6 +626,17 @@ extension PlaybackViewModel {
             // Fetch player info using the iOS client (unauthenticated).
             // If YouTube returns UNPLAYABLE/LOGIN_REQUIRED and the user is signed in,
             // automatically retry with the authenticated TV client before showing an error.
+            // Restore saved watch position (mirrors VideoStateController). Looked up before
+            // any fetch so every playback path resumes — including the fallback chain that
+            // tvOS (and the "no playable URLs" route) use, which never reach the primary path.
+            // Always assigned so a previous video's unconsumed position can't leak in.
+            if let pos = await VideoStateStore.shared.state(for: video.id)?.position, pos > 5 {
+                savedPositionToRestore = pos
+                playerLog.notice("Restoring position \(Int(pos))s for \(video.id)")
+            } else {
+                savedPositionToRestore = nil
+            }
+
             let info: PlayerInfo
             if let cachedInfo = cached.playerInfo {
                 playerLog.notice(
@@ -638,6 +649,14 @@ extension PlaybackViewModel {
                 playerLog.notice("PREFETCH_COALESCE: playerInfo for \(video.id) — joined in-flight prefetch task")
                 info = coalescedInfo
             } else {
+                #if os(tvOS)
+                // tvOS: the iOS client returns SABR-only formats (no playable URLs, Nov 2026),
+                // so asking it first only adds a round-trip. exhaustiveRetry starts with the
+                // visionOS client (H.264 HLS) and owns the rest of the fallback chain.
+                playerLog.notice("[tvOS] skipping iOS client — exhaustiveRetry (visionOS first)")
+                await exhaustiveRetry(video: video, originalError: nil, playerInfo: nil, cached: cached)
+                return
+                #else
                 do {
                     info = try await api.fetchPlayerInfo(videoId: video.id)
                 } catch {
@@ -685,6 +704,7 @@ extension PlaybackViewModel {
                     }
                 }
                 await VideoPreloadCache.shared.store(playerInfo: info, for: video.id)
+                #endif
             }
             // BUG-005 fix: guard against rapid navigation — if the user navigated away while we
             // were awaiting the player info, discard this result rather than overwrite ViewModel state.
@@ -752,12 +772,6 @@ extension PlaybackViewModel {
                 sponsorCached = true  // disabled/excluded — no fetch needed in Phase 2
             }
 
-            // Restore saved watch position (mirrors VideoStateController)
-            let savedState = await VideoStateStore.shared.state(for: video.id)
-            if let pos = savedState?.position, pos > 5 {
-                savedPositionToRestore = pos
-                playerLog.notice("Restoring position \(Int(pos))s for \(video.id)")
-            }
             // Filter the quality picker to only heights that the HLS manifest actually
             // offers. The iOS player response lists all adaptive CDN formats at every
             // quality, but the HLS variant playlist may omit qualities the CDN has not
@@ -1147,6 +1161,11 @@ extension PlaybackViewModel {
                     shouldRetryWithFallback = hasAuthToken
                 case .httpError(403):
                     shouldRetryWithFallback = hasAuthToken
+                case .unavailable where apiErr.isNoPlayableURLs:
+                    // Primary (iOS) client returned SABR-only / undecipherable formats. The
+                    // video is playable — other clients (VisionOS, MWEB with on-device
+                    // deciphering, TVEmbedded…) usually return real URLs. Signed in or not.
+                    shouldRetryWithFallback = true
                 default:
                     shouldRetryWithFallback = false
                 }
@@ -1155,7 +1174,7 @@ extension PlaybackViewModel {
             }
             if shouldRetryWithFallback {
                 playerLog.notice(
-                    "⚠️ \(error.localizedDescription) from primary client (signed-in user) — routing to exhaustiveRetry for fallback clients"
+                    "⚠️ \(error.localizedDescription) from primary client — routing to exhaustiveRetry for fallback clients"
                 )
                 exhaustiveRetryTask?.cancel()
                 exhaustiveRetryTask = Task { [weak self] in
