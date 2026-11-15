@@ -73,6 +73,8 @@ public struct AppSettings: Codable {
     public var hideShorts: Bool
     /// tvOS Home: show the large featured-video banner above the shelves.
     public var showHomeHero: Bool
+    /// Play VisionOS HLS from its VP9 ladder (up to 4K) on devices that decode VP9.
+    public var prefer4KVP9: Bool
     public var hideLiveShorts: Bool
     public var hideVideoPremieres: Bool
     /// When `true` (default), a per-device `visitorData` token is included in home-feed
@@ -285,6 +287,7 @@ public struct AppSettings: Codable {
         settingsPINHash = nil
         hideShorts = false
         showHomeHero = true
+        prefer4KVP9 = false
         hideLiveShorts = false
         hideVideoPremieres = false
         perDeviceRecommendationsEnabled = true
@@ -376,6 +379,7 @@ extension AppSettings {
         case settingsPINHash
         case hideShorts
         case showHomeHero
+        case prefer4KVP9
         case hideLiveShorts
         case hideVideoPremieres
         case perDeviceRecommendationsEnabled
@@ -433,6 +437,7 @@ extension AppSettings {
         settingsPINHash = c.safeDecode(String?.self, forKey: .settingsPINHash, default: d.settingsPINHash)
         hideShorts = c.safeDecode(Bool.self, forKey: .hideShorts, default: d.hideShorts)
         showHomeHero = c.safeDecode(Bool.self, forKey: .showHomeHero, default: d.showHomeHero)
+        prefer4KVP9 = c.safeDecode(Bool.self, forKey: .prefer4KVP9, default: d.prefer4KVP9)
         hideLiveShorts = c.safeDecode(Bool.self, forKey: .hideLiveShorts, default: d.hideLiveShorts)
         hideVideoPremieres = c.safeDecode(Bool.self, forKey: .hideVideoPremieres, default: d.hideVideoPremieres)
         perDeviceRecommendationsEnabled = c.safeDecode(

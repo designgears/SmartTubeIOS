@@ -72,6 +72,8 @@ package enum InnerTubeClients {
         /// Higher HLS tiers are currently VP9/AV1; tvOS AVFoundation needs the
         /// H.264 ladder, which tops out at 1080p for this client.
         package static let maximumHLSHeight = 1080
+        /// The same master's VP9 ladder reaches 2160p (Settings › 4K, devices that decode VP9).
+        package static let maximumVP9HLSHeight = 2160
     }
 
     /// Web Embedded Player client — the current YouTube iframe embedded player.

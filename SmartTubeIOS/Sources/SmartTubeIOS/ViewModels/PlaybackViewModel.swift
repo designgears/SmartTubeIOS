@@ -534,6 +534,7 @@ public final class PlaybackViewModel {
         defaultPlaybackSpeed = newSettings.playbackSpeed
         settings = newSettings
         isAudioOnlyMode = newSettings.audioOnlyMode
+        HLSPlaybackPolicy.prefersVP9 = newSettings.prefer4KVP9
         applyEffectiveSpeed()
     }
 }

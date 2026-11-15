@@ -67,6 +67,25 @@ struct VisionOSPlaybackTests {
             ))
     }
 
+    @Test("VisionOS with VP9 allowed uses the VP9 ladder up to 2160p")
+    func visionOSVP9Policy() {
+        let policy = HLSPlaybackPolicy.resolve(label: "VisionOS/HLS", isHLS: true, allowsVP9: true)
+        #expect(policy.requiredVideoCodec == "vp09")
+        #expect(!policy.requiresH264)
+        #expect(policy.cappedHeight(requested: nil) == 2160)
+        // Adaptive formats spell VP9 as `vp9`, HLS as `vp09`; both are allowed, H.264 is not.
+        #expect(policy.allowsFormat(height: 2160, mimeType: "video/webm; codecs=\"vp9\""))
+        #expect(policy.allowsFormat(height: 1440, mimeType: "video/mp4; codecs=\"vp09.00.50.08\""))
+        #expect(!policy.allowsFormat(height: 1080, mimeType: "video/mp4; codecs=\"avc1.640028\""))
+    }
+
+    @Test("VisionOS stays on H.264 when VP9 is not allowed")
+    func visionOSWithoutVP9() {
+        let policy = HLSPlaybackPolicy.resolve(label: "VisionOS/HLS", isHLS: true, allowsVP9: false)
+        #expect(policy.requiredVideoCodec == "avc1")
+        #expect(policy.cappedHeight(requested: 2160) == 1080)
+    }
+
     @Test("WebSafari HLS retains its browser UA without a height cap")
     func webSafariPolicyUnchanged() {
         let policy = HLSPlaybackPolicy.resolve(label: "WebSafari[1]/HLS", isHLS: true)

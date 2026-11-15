@@ -189,8 +189,18 @@ public struct SettingsView: View {
                 .accessibilityIdentifier("settings.preferredQualityPicker")
             }
 
-            TVPickerRow("Preferred Audio Language", value: Self.audioLanguageLabel(store.settings.preferredAudioLanguage),
-                choices: tvChoices($store.settings.preferredAudioLanguage, Self.audioLanguageCodes) { Self.audioLanguageLabel($0) }) {
+            if VideoCodecSupport.vp9HLS {
+                // Only offered where VP9 is hardware-decoded (e.g. Apple TV 4K).
+                Toggle("4K (VP9)", isOn: $store.settings.prefer4KVP9)
+                    .accessibilityIdentifier("settings.prefer4KVP9Toggle")
+            }
+
+            TVPickerRow(
+                "Preferred Audio Language", value: Self.audioLanguageLabel(store.settings.preferredAudioLanguage),
+                choices: tvChoices($store.settings.preferredAudioLanguage, Self.audioLanguageCodes) {
+                    Self.audioLanguageLabel($0)
+                }
+            ) {
                 Picker("Preferred Audio Language", selection: $store.settings.preferredAudioLanguage) {
                     Text("System Default").tag(nil as String?)
                     Divider()

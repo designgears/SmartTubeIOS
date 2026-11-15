@@ -18,39 +18,43 @@ struct HLSPlaybackPolicy: Equatable, Sendable {
     let userAgent: String
     let maximumHeight: Int?
     let filtersMasterManifest: Bool
-    let requiresH264: Bool
+    /// HLS codec prefix the master is filtered to (`avc1` or `vp09`); nil = no filtering.
+    let requiredVideoCodec: String?
 
-    static func resolve(label: String, isHLS: Bool) -> Self {
+    /// Kept for callers/tests that only care about the H.264 ladder.
+    var requiresH264: Bool { requiredVideoCodec == "avc1" }
+
+    /// Settings › 4K (VP9): when on and the device can play VP9 HLS, VisionOS HLS uses its
+    /// VP9 ladder (to 2160p) instead of the H.264 one (to 1080p). Set from AppSettings.
+    nonisolated(unsafe) static var prefersVP9 = false
+
+    static func resolve(
+        label: String, isHLS: Bool, allowsVP9: Bool = prefersVP9 && VideoCodecSupport.vp9HLS
+    )
+        -> Self
+    {
+        let iOSUA = "com.google.ios.youtube/19.45.4 (iPhone16,2; U; CPU iOS 18_1_0 like Mac OS X)"
         guard isHLS else {
-            return Self(
-                userAgent: "com.google.ios.youtube/19.45.4 (iPhone16,2; U; CPU iOS 18_1_0 like Mac OS X)",
-                maximumHeight: nil,
-                filtersMasterManifest: false,
-                requiresH264: false
-            )
+            return Self(userAgent: iOSUA, maximumHeight: nil, filtersMasterManifest: false, requiredVideoCodec: nil)
         }
         if label.localizedCaseInsensitiveContains("visionos") {
+            // The VisionOS master mixes an H.264 ladder (≤1080p) with a VP9 one (≤2160p).
+            // Keep a single codec so ABR never switches decoders mid-stream.
             return Self(
                 userAgent: InnerTubeClients.VisionOS.userAgent,
-                maximumHeight: InnerTubeClients.VisionOS.maximumHLSHeight,
+                maximumHeight: allowsVP9
+                    ? InnerTubeClients.VisionOS.maximumVP9HLSHeight
+                    : InnerTubeClients.VisionOS.maximumHLSHeight,
                 filtersMasterManifest: true,
-                requiresH264: true
+                requiredVideoCodec: allowsVP9 ? "vp09" : "avc1"
             )
         }
         if label.contains("WebSafari") {
             return Self(
-                userAgent: InnerTubeClients.WebSafari.userAgent,
-                maximumHeight: nil,
-                filtersMasterManifest: false,
-                requiresH264: false
-            )
+                userAgent: InnerTubeClients.WebSafari.userAgent, maximumHeight: nil,
+                filtersMasterManifest: false, requiredVideoCodec: nil)
         }
-        return Self(
-            userAgent: "com.google.ios.youtube/19.45.4 (iPhone16,2; U; CPU iOS 18_1_0 like Mac OS X)",
-            maximumHeight: nil,
-            filtersMasterManifest: false,
-            requiresH264: false
-        )
+        return Self(userAgent: iOSUA, maximumHeight: nil, filtersMasterManifest: false, requiredVideoCodec: nil)
     }
 
     func cappedHeight(requested: Int?) -> Int? {
@@ -60,8 +64,12 @@ struct HLSPlaybackPolicy: Equatable, Sendable {
 
     func allowsFormat(height: Int, mimeType: String) -> Bool {
         if let maximumHeight, height > maximumHeight { return false }
-        if requiresH264, !mimeType.contains("avc1") { return false }
-        return true
+        switch requiredVideoCodec {
+        case "avc1": return mimeType.contains("avc1")
+        // Adaptive formats say `video/webm; codecs="vp9"`; HLS says `vp09.…`.
+        case "vp09": return mimeType.contains("vp9") || mimeType.contains("vp09")
+        default: return true
+        }
     }
 }
 
@@ -1101,7 +1109,7 @@ extension PlaybackViewModel {
                 } ?? allVariantURLs
             playerLog.notice(
                 "[\(label)] HLS: hlsURL=yes variantCount=\(variantURLs.count) effectiveQuality=\(effectiveQuality)")
-            if hlsPolicy.requiresH264 {
+            if hlsPolicy.requiredVideoCodec != nil {
                 availableFormats = availableFormats.filter { format in
                     hlsPolicy.allowsFormat(height: format.height, mimeType: format.mimeType)
                 }
@@ -1126,7 +1134,8 @@ extension PlaybackViewModel {
                     if hlsPolicy.filtersMasterManifest {
                         effectiveURL = hlsURL
                         playerLog.notice(
-                            "[\(label)] HLS: using H.264-filtered master with \(chosen.key)p cap and audio renditions")
+                            "[\(label)] HLS: using \(hlsPolicy.requiredVideoCodec ?? "unfiltered")-filtered master with \(chosen.key)p cap and audio renditions"
+                        )
                     } else {
                         effectiveURL = chosen.value
                         playerLog.notice("[\(label)] HLS: selected variant \(chosen.key)p")
@@ -1232,7 +1241,7 @@ extension PlaybackViewModel {
             qualityManager.configureHLSPlayback(
                 userAgent: hlsPolicy.userAgent,
                 maximumHeight: hlsPolicy.maximumHeight,
-                requiredVideoCodec: hlsPolicy.requiresH264 ? "avc1" : nil,
+                requiredVideoCodec: hlsPolicy.requiredVideoCodec,
                 solvesNChallenges: info.hlsRequiresNTransform
             )
             qualityManager.setSelectedFormatForCurrentPreference()
