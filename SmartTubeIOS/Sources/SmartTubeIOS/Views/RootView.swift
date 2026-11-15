@@ -35,7 +35,8 @@ public struct RootView: View {
         #endif
         Group {
             #if os(tvOS)
-            MainTVTabView()
+            // Native tvOS UI (sidebar, shelves, AVPlayerViewController) — Views/TV/.
+            TVRootView()
             #elseif os(macOS)
             MainSidebarView()
             #else

@@ -25,12 +25,23 @@ struct ChannelSwitcherView: View {
                 if isLoading {
                     ProgressView()
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        #if os(tvOS)
+                        .focusable()  // keep the Siri Remote from getting stuck while loading
+                        #endif
                 } else {
-                    ContentUnavailableView(
-                        "No Channels",
-                        systemImage: AppSymbol.channel,
-                        description: Text("Could not load the channels of this account.")
-                    )
+                    ContentUnavailableView {
+                        Label("No Channels", systemImage: AppSymbol.channel)
+                    } description: {
+                        Text("Could not load the channels of this account.")
+                    } actions: {
+                        Button("Try Again") {
+                            Task {
+                                isLoading = true
+                                await auth.loadChannelsIfNeeded()
+                                isLoading = false
+                            }
+                        }
+                    }
                 }
             } else {
                 List(auth.channels.filter(\.isPrimary) + auth.channels.filter { !$0.isPrimary }) { channel in

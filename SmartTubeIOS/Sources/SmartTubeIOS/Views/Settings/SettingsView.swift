@@ -56,6 +56,12 @@ public struct SettingsView: View {
         #if os(macOS)
         .formStyle(.grouped)
         #endif
+        #if os(tvOS)
+        // Navigation-link pickers (the tvOS default) push a blank, unfocusable page
+        // inside the sidebar TabView, which traps the Siri Remote. Menu pickers show
+        // their options in a native popup instead — no push.
+        .pickerStyle(.menu)
+        #endif
         // Hide the blank navigation bar on iOS and tvOS — a visible nav bar on tvOS
         // conflicts with the TabView tab bar scroll-hide animation (issue #102 / gh-34).
         // .navigationBar placement is unavailable on macOS.
@@ -156,9 +162,12 @@ public struct SettingsView: View {
     private var playerSection: some View {
         @Bindable var store = store
         return Section("Player") {
-            Picker("Playback Speed", selection: $store.settings.playbackSpeed) {
-                ForEach(AppSettings.availableSpeeds, id: \.self) { s in
-                    Text(s == 1.0 ? "Normal" : "\(s, specifier: "%.2g")×").tag(s)
+            TVPickerRow("Default Playback Speed", value: Self.speedLabel(store.settings.playbackSpeed),
+                choices: tvChoices($store.settings.playbackSpeed, AppSettings.availableSpeeds) { Self.speedLabel($0) }) {
+                Picker("Default Playback Speed", selection: $store.settings.playbackSpeed) {
+                    ForEach(AppSettings.availableSpeeds, id: \.self) { s in
+                        Text(s == 1.0 ? "Normal" : "\(s, specifier: "%.2g")×").tag(s)
+                    }
                 }
             }
             if !store.settings.channelPlaybackSpeeds.isEmpty {
@@ -170,44 +179,38 @@ public struct SettingsView: View {
             }
 
             #if !os(iOS)
-            Picker("Default Quality", selection: $store.settings.preferredQuality) {
-                ForEach(AppSettings.VideoQuality.allCases, id: \.self) { q in
-                    Text(q.rawValue.capitalized).tag(q)
+            TVPickerRow("Default Quality", value: store.settings.preferredQuality.rawValue.capitalized,
+                choices: tvChoices($store.settings.preferredQuality, AppSettings.VideoQuality.allCases) { $0.rawValue.capitalized }) {
+                Picker("Default Quality", selection: $store.settings.preferredQuality) {
+                    ForEach(AppSettings.VideoQuality.allCases, id: \.self) { q in
+                        Text(q.rawValue.capitalized).tag(q)
+                    }
                 }
+                .accessibilityIdentifier("settings.preferredQualityPicker")
             }
-            .accessibilityIdentifier("settings.preferredQualityPicker")
 
-            Picker("Preferred Audio Language", selection: $store.settings.preferredAudioLanguage) {
-                Text("System Default").tag(nil as String?)
-                Divider()
-                Text("English").tag("en" as String?)
-                Text("Spanish").tag("es" as String?)
-                Text("French").tag("fr" as String?)
-                Text("German").tag("de" as String?)
-                Text("Japanese").tag("ja" as String?)
-                Text("Korean").tag("ko" as String?)
-                Text("Portuguese (Brazil)").tag("pt-BR" as String?)
-                Text("Chinese (Simplified)").tag("zh-Hans" as String?)
-                Divider()
-                Text("Original Track Only").tag("original" as String?)
+            TVPickerRow("Preferred Audio Language", value: Self.audioLanguageLabel(store.settings.preferredAudioLanguage),
+                choices: tvChoices($store.settings.preferredAudioLanguage, Self.audioLanguageCodes) { Self.audioLanguageLabel($0) }) {
+                Picker("Preferred Audio Language", selection: $store.settings.preferredAudioLanguage) {
+                    Text("System Default").tag(nil as String?)
+                    Divider()
+                    Text("English").tag("en" as String?)
+                    Text("Spanish").tag("es" as String?)
+                    Text("French").tag("fr" as String?)
+                    Text("German").tag("de" as String?)
+                    Text("Japanese").tag("ja" as String?)
+                    Text("Korean").tag("ko" as String?)
+                    Text("Portuguese (Brazil)").tag("pt-BR" as String?)
+                    Text("Chinese (Simplified)").tag("zh-Hans" as String?)
+                    Divider()
+                    Text("Original Track Only").tag("original" as String?)
+                }
+                .accessibilityIdentifier("settings.preferredAudioLanguageRow")
             }
-            .accessibilityIdentifier("settings.preferredAudioLanguageRow")
             #endif
 
-            #if os(tvOS)
-            Picker("Seek Back", selection: $store.settings.seekBackSeconds) {
-                ForEach(AppSettings.availableSeekOptions, id: \.self) { s in
-                    Text("\(s) s").tag(s)
-                }
-            }
-            .accessibilityIdentifier("settings.seekBackRow")
-            Picker("Seek Forward", selection: $store.settings.seekForwardSeconds) {
-                ForEach(AppSettings.availableSeekOptions, id: \.self) { s in
-                    Text("\(s) s").tag(s)
-                }
-            }
-            .accessibilityIdentifier("settings.seekForwardRow")
-            #elseif os(macOS)
+            // tvOS uses the native player's own skip behaviour — no seek settings there.
+            #if os(macOS)
             Stepper(
                 "Seek Back: \(store.settings.seekBackSeconds) s",
                 value: $store.settings.seekBackSeconds,
@@ -224,19 +227,27 @@ public struct SettingsView: View {
             .accessibilityIdentifier("settings.seekForwardRow")
             #endif
 
-            #if !os(iOS)
-            Picker("Hide Controls After", selection: $store.settings.controlsHideTimeout) {
-                Text("2s").tag(2)
-                Text("3s").tag(3)
-                Text("4s").tag(4)
-                Text("5s").tag(5)
-                Text("8s").tag(8)
-                Text("10s").tag(10)
+            #if os(macOS)
+            // The tvOS native player manages its own controls.
+            TVPickerRow("Hide Controls After", value: "\(store.settings.controlsHideTimeout)s") {
+                Picker("Hide Controls After", selection: $store.settings.controlsHideTimeout) {
+                    Text("2s").tag(2)
+                    Text("3s").tag(3)
+                    Text("4s").tag(4)
+                    Text("5s").tag(5)
+                    Text("8s").tag(8)
+                    Text("10s").tag(10)
+                }
             }
+            #endif
 
-            Picker("Video Fit", selection: $store.settings.videoGravityMode) {
-                Text("Fit (letterbox)").tag(AppSettings.VideoGravityMode.fit)
-                Text("Fill (crop)").tag(AppSettings.VideoGravityMode.fill)
+            #if !os(iOS)
+            TVPickerRow("Video Fit", value: store.settings.videoGravityMode == .fill ? "Fill (crop)" : "Fit (letterbox)",
+                choices: tvChoices($store.settings.videoGravityMode, [.fit, .fill]) { $0 == .fill ? "Fill (crop)" : "Fit (letterbox)" }) {
+                Picker("Video Fit", selection: $store.settings.videoGravityMode) {
+                    Text("Fit (letterbox)").tag(AppSettings.VideoGravityMode.fit)
+                    Text("Fill (crop)").tag(AppSettings.VideoGravityMode.fill)
+                }
             }
             #endif
 
@@ -257,9 +268,12 @@ public struct SettingsView: View {
     private var generalSection: some View {
         @Bindable var store = store
         return Section {
-            Picker("Watch History", selection: $store.settings.historyState) {
-                Text("Enabled").tag(AppSettings.HistoryState.enabled)
-                Text("Disabled").tag(AppSettings.HistoryState.disabled)
+            TVPickerRow("Watch History", value: store.settings.historyState == .enabled ? "Enabled" : "Disabled",
+                choices: tvChoices($store.settings.historyState, [.enabled, .disabled]) { $0 == .enabled ? "Enabled" : "Disabled" }) {
+                Picker("Watch History", selection: $store.settings.historyState) {
+                    Text("Enabled").tag(AppSettings.HistoryState.enabled)
+                    Text("Disabled").tag(AppSettings.HistoryState.disabled)
+                }
             }
             if !LocalWatchHistoryStore.shared.entries.isEmpty {
                 Button("Clear Watch History on This Device", role: .destructive) {
@@ -301,40 +315,65 @@ public struct SettingsView: View {
     private var uiSection: some View {
         @Bindable var store = store
         return Section("Interface") {
-            Picker("Theme", selection: $store.settings.themeName) {
-                ForEach(AppSettings.ThemeName.allCases, id: \.self) { t in
-                    Text(t.rawValue).tag(t)
-                }
-            }
-            .accessibilityIdentifier("settings.themeRow")
-            Picker("Accent Color", selection: $store.settings.accentColor) {
-                ForEach(AppSettings.AccentColorChoice.allCases, id: \.self) { choice in
-                    Label {
-                        Text(choice.displayName)
-                    } icon: {
-                        choice.swatch
+            TVPickerRow("Theme", value: store.settings.themeName.rawValue,
+                choices: tvChoices($store.settings.themeName, AppSettings.ThemeName.allCases) { $0.rawValue }) {
+                Picker("Theme", selection: $store.settings.themeName) {
+                    ForEach(AppSettings.ThemeName.allCases, id: \.self) { t in
+                        Text(t.rawValue).tag(t)
                     }
-                    .tag(choice)
                 }
+                .accessibilityIdentifier("settings.themeRow")
             }
-            .accessibilityIdentifier("settings.accentColorPicker")
-            Picker("Thumbnails", selection: thumbnailStyle) {
-                Text("Standard").tag(ThumbnailStyle.standard)
-                Text("High Resolution").tag(ThumbnailStyle.highResolution)
-                Text("Compact").tag(ThumbnailStyle.compact)
+            TVPickerRow("Accent Color", value: store.settings.accentColor.displayName,
+                choices: tvChoices($store.settings.accentColor, AppSettings.AccentColorChoice.allCases) { $0.displayName }) {
+                Picker("Accent Color", selection: $store.settings.accentColor) {
+                    ForEach(AppSettings.AccentColorChoice.allCases, id: \.self) { choice in
+                        #if os(tvOS)
+                        // tvOS pushes picker options as a list; a Label with a custom (non-Image)
+                        // icon renders as an empty, unfocusable page there.
+                        Text(choice.displayName).tag(choice)
+                        #else
+                        Label {
+                            Text(choice.displayName)
+                        } icon: {
+                            choice.swatch
+                        }
+                        .tag(choice)
+                        #endif
+                    }
+                }
+                .accessibilityIdentifier("settings.accentColorPicker")
             }
-            .accessibilityIdentifier("settings.thumbnailStylePicker")
             #if !os(tvOS)
-            Picker("Columns (Portrait)", selection: $store.settings.gridColumnsPortrait) {
-                ForEach(AppSettings.availableGridColumnCounts, id: \.self) { Text("\($0)").tag($0) }
+            // tvOS cards always use high-resolution thumbnails.
+            TVPickerRow("Thumbnails") {
+                Picker("Thumbnails", selection: thumbnailStyle) {
+                    Text("Standard").tag(ThumbnailStyle.standard)
+                    Text("High Resolution").tag(ThumbnailStyle.highResolution)
+                    Text("Compact").tag(ThumbnailStyle.compact)
+                }
+                .accessibilityIdentifier("settings.thumbnailStylePicker")
             }
-            .disabled(store.settings.compactThumbnails)
-            .accessibilityIdentifier("settings.gridColumnsPortraitPicker")
-            Picker("Columns (Landscape)", selection: $store.settings.gridColumnsLandscape) {
-                ForEach(AppSettings.availableGridColumnCounts, id: \.self) { Text("\($0)").tag($0) }
+            #endif
+            #if !os(tvOS)
+            TVPickerRow("Columns (Portrait)") {
+                Picker("Columns (Portrait)", selection: $store.settings.gridColumnsPortrait) {
+                    ForEach(AppSettings.availableGridColumnCounts, id: \.self) { Text("\($0)").tag($0) }
+                }
+                .disabled(store.settings.compactThumbnails)
+                .accessibilityIdentifier("settings.gridColumnsPortraitPicker")
             }
-            .disabled(store.settings.compactThumbnails)
-            .accessibilityIdentifier("settings.gridColumnsLandscapePicker")
+            TVPickerRow("Columns (Landscape)") {
+                Picker("Columns (Landscape)", selection: $store.settings.gridColumnsLandscape) {
+                    ForEach(AppSettings.availableGridColumnCounts, id: \.self) { Text("\($0)").tag($0) }
+                }
+                .disabled(store.settings.compactThumbnails)
+                .accessibilityIdentifier("settings.gridColumnsLandscapePicker")
+            }
+            #endif
+            #if os(tvOS)
+            Toggle("Featured Banner on Home", isOn: $store.settings.showHomeHero)
+                .accessibilityIdentifier("settings.showHomeHeroToggle")
             #endif
             Toggle("Hide Shorts", isOn: $store.settings.hideShorts)
                 .accessibilityIdentifier("settings.hideShortsToggle")
@@ -349,12 +388,15 @@ public struct SettingsView: View {
             if store.settings.hideWatchedVideos {
                 #if os(tvOS)
                 // tvOS has no Stepper.
-                Picker("Watched threshold", selection: $store.settings.hideWatchedThreshold) {
-                    ForEach(Array(stride(from: 50, through: 100, by: 5)), id: \.self) { percent in
-                        Text("\(percent)%").tag(Double(percent) / 100)
+                TVPickerRow("Watched threshold", value: "\(Int((store.settings.hideWatchedThreshold * 100).rounded()))%",
+                    choices: tvChoices($store.settings.hideWatchedThreshold, stride(from: 50, through: 100, by: 5).map { Double($0) / 100 }) { "\(Int(($0 * 100).rounded()))%" }) {
+                    Picker("Watched threshold", selection: $store.settings.hideWatchedThreshold) {
+                        ForEach(Array(stride(from: 50, through: 100, by: 5)), id: \.self) { percent in
+                            Text("\(percent)%").tag(Double(percent) / 100)
+                        }
                     }
+                    .accessibilityIdentifier("settings.hideWatchedThresholdStepper")
                 }
-                .accessibilityIdentifier("settings.hideWatchedThresholdStepper")
                 #else
                 Stepper(
                     "Watched threshold: \(Int(store.settings.hideWatchedThreshold * 100))%",
@@ -369,11 +411,14 @@ public struct SettingsView: View {
                     .accessibilityIdentifier("settings.disableLiquidGlassToggle")
             }
             #endif
+            #if !os(tvOS)
+            // tvOS uses a fixed sidebar, so section visibility doesn't apply there.
             NavigationLink("Visible Sections") {
                 SectionsSettingsView()
                     .environment(store)
             }
             .accessibilityIdentifier("settings.visibleSectionsLink")
+            #endif
         }
     }
 
@@ -388,31 +433,49 @@ public struct SettingsView: View {
             if store.settings.sponsorBlockEnabled {
                 ForEach(SponsorSegment.Category.allCases, id: \.self) { cat in
                     HStack {
+                        #if !os(tvOS)
                         Circle()
                             .fill(cat.color)
                             .frame(width: 10, height: 10)
-                        Picker(
+                        #endif
+                        TVPickerRow(
                             cat.displayName,
-                            selection: Binding(
-                                get: { store.settings.sponsorBlockActions[cat] ?? .nothing },
-                                set: { store.settings.sponsorBlockActions[cat] = $0 }
-                            )
+                            value: Self.sponsorActionLabel(store.settings.sponsorBlockActions[cat] ?? .nothing),
+                            dot: cat.color,
+                            choices: tvChoices(
+                                Binding(
+                                    get: { store.settings.sponsorBlockActions[cat] ?? .nothing },
+                                    set: { store.settings.sponsorBlockActions[cat] = $0 }
+                                ),
+                                [.skip, .showToast, .nothing]
+                            ) { Self.sponsorActionLabel($0) }
                         ) {
-                            Text("Skip").tag(AppSettings.SponsorBlockAction.skip)
-                            Text("Show Toast").tag(AppSettings.SponsorBlockAction.showToast)
-                            Text("Nothing").tag(AppSettings.SponsorBlockAction.nothing)
+                            Picker(
+                                cat.displayName,
+                                selection: Binding(
+                                    get: { store.settings.sponsorBlockActions[cat] ?? .nothing },
+                                    set: { store.settings.sponsorBlockActions[cat] = $0 }
+                                )
+                            ) {
+                                Text("Skip").tag(AppSettings.SponsorBlockAction.skip)
+                                Text("Show Toast").tag(AppSettings.SponsorBlockAction.showToast)
+                                Text("Nothing").tag(AppSettings.SponsorBlockAction.nothing)
+                            }
+                            .accessibilityIdentifier("settings.sponsorBlock.\(cat.rawValue)")
                         }
-                        .accessibilityIdentifier("settings.sponsorBlock.\(cat.rawValue)")
                     }
                 }
 
                 // Minimum segment duration
-                Picker("Min. Segment Length", selection: $store.settings.sponsorBlockMinSegmentDuration) {
-                    Text("Off").tag(0.0)
-                    Text("1s").tag(1.0)
-                    Text("2s").tag(2.0)
-                    Text("5s").tag(5.0)
-                    Text("10s").tag(10.0)
+                TVPickerRow("Min. Segment Length", value: Self.segmentLengthLabel(store.settings.sponsorBlockMinSegmentDuration),
+                    choices: tvChoices($store.settings.sponsorBlockMinSegmentDuration, [0, 1, 2, 5, 10]) { Self.segmentLengthLabel($0) }) {
+                    Picker("Min. Segment Length", selection: $store.settings.sponsorBlockMinSegmentDuration) {
+                        Text("Off").tag(0.0)
+                        Text("1s").tag(1.0)
+                        Text("2s").tag(2.0)
+                        Text("5s").tag(5.0)
+                        Text("10s").tag(10.0)
+                    }
                 }
 
                 // Excluded channels
@@ -465,7 +528,7 @@ public struct SettingsView: View {
         @Bindable var store = store
         return Section {
             LabeledContent("Version", value: appVersion)
-            Toggle("Disable Analytics & Crash Reporting", isOn: $store.settings.disableAnalytics)
+            Toggle("Disable Diagnostic Logging", isOn: $store.settings.disableAnalytics)
                 .accessibilityIdentifier("settings.disableAnalyticsToggle")
             Text("Restart the app for this to take effect.")
                 .font(.caption)
@@ -486,10 +549,10 @@ public struct SettingsView: View {
                 reportSent = true
             } label: {
                 if reportSent {
-                    Label("Report Sent", systemImage: "checkmark.circle.fill")
+                    Label("Report Saved", systemImage: "checkmark.circle.fill")
                         .foregroundStyle(.green)
                 } else {
-                    Label("Send Diagnostic Report", systemImage: "ladybug")
+                    Label("Save Diagnostic Report", systemImage: "ladybug")
                 }
             }
             .disabled(reportSent || store.settings.disableAnalytics)
@@ -502,6 +565,52 @@ public struct SettingsView: View {
     }
 
     // MARK: - Helpers
+
+    /// Language codes offered by the Preferred Audio Language picker (nil = system default).
+    static let audioLanguageCodes: [String?] = [nil, "en", "es", "fr", "de", "ja", "ko", "pt-BR", "zh-Hans", "original"]
+
+    /// Builds the tvOS option list for a `TVPickerRow` from a binding and its values.
+    func tvChoices<V: Equatable>(
+        _ binding: Binding<V>, _ values: [V], label: (V) -> String
+    ) -> [TVChoice] {
+        values.map { value in
+            TVChoice(label: label(value), isSelected: binding.wrappedValue == value) {
+                binding.wrappedValue = value
+            }
+        }
+    }
+
+    static func speedLabel(_ speed: Double) -> String {
+        speed == 1.0 ? "Normal" : "\(speed.formatted(.number.precision(.fractionLength(0...2))))×"
+    }
+
+    static func audioLanguageLabel(_ code: String?) -> String {
+        switch code {
+        case nil: return "System Default"
+        case "original": return "Original Track Only"
+        case "en": return "English"
+        case "es": return "Spanish"
+        case "fr": return "French"
+        case "de": return "German"
+        case "ja": return "Japanese"
+        case "ko": return "Korean"
+        case "pt-BR": return "Portuguese (Brazil)"
+        case "zh-Hans": return "Chinese (Simplified)"
+        case let other?: return Locale.current.localizedString(forIdentifier: other) ?? other
+        }
+    }
+
+    static func segmentLengthLabel(_ seconds: Double) -> String {
+        seconds == 0 ? "Off" : "\(Int(seconds))s"
+    }
+
+    static func sponsorActionLabel(_ action: AppSettings.SponsorBlockAction) -> String {
+        switch action {
+        case .skip: return "Skip"
+        case .showToast: return "Show Toast"
+        case .nothing: return "Nothing"
+        }
+    }
 
     private var appVersion: String {
         let v = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
@@ -657,9 +766,26 @@ struct SponsorBlockExcludedChannelsView: View {
                     description: Text(
                         "Open a channel and tap \u{201C}Exclude from SponsorBlock\u{201D} to add it here.")
                 )
+                #if os(tvOS)
+                // Something must take focus or the page traps the Siri Remote.
+                .focusable()
+                #endif
             } else {
                 ForEach(sortedChannels, id: \.key) { channelId, title in
+                    #if os(tvOS)
+                    // tvOS has no swipe-to-delete: rows are buttons that remove the channel.
+                    Button {
+                        store.settings.sponsorBlockExcludedChannels.removeValue(forKey: channelId)
+                    } label: {
+                        HStack {
+                            Text(title)
+                            Spacer()
+                            Text("Remove").foregroundStyle(.secondary)
+                        }
+                    }
+                    #else
                     Text(title)
+                    #endif
                 }
                 .onDelete { indices in
                     let ids = indices.map { sortedChannels[$0].key }
@@ -674,6 +800,106 @@ struct SponsorBlockExcludedChannelsView: View {
         .toolbar {
             EditButton()
         }
+        #endif
+    }
+}
+
+// MARK: - TVPickerRow
+
+/// One option in a tvOS Settings choice list.
+struct TVChoice: Identifiable {
+    let id = UUID()
+    let label: String
+    let isSelected: Bool
+    let select: () -> Void
+}
+
+/// tvOS: a Settings row that looks like the system Settings app — a regular full-width row
+/// (native focus highlight), title on the left, current value on the right. Selecting it
+/// opens the `choices` as a list of buttons in a sheet (checkmark on the current one);
+/// choosing one applies it and closes the sheet.
+///
+/// SwiftUI `Picker` can't be used for this on tvOS here: navigation-link pickers push a
+/// blank page inside the sidebar TabView (and Menu then exits the app), inline/menu pickers
+/// render no options or an inset pill. On other platforms this is the picker unchanged.
+struct TVPickerRow<P: View>: View {
+    private let title: Text
+    private let value: String?
+    private let dot: Color?
+    private let choices: [TVChoice]
+    private let picker: () -> P
+    @State private var showOptions = false
+
+    init(
+        _ title: LocalizedStringKey, value: String? = nil, dot: Color? = nil, choices: [TVChoice] = [],
+        @ViewBuilder picker: @escaping () -> P
+    ) {
+        self.title = Text(title)
+        self.value = value
+        self.dot = dot
+        self.choices = choices
+        self.picker = picker
+    }
+
+    @_disfavoredOverload
+    init<S: StringProtocol>(
+        _ title: S, value: String? = nil, dot: Color? = nil, choices: [TVChoice] = [],
+        @ViewBuilder picker: @escaping () -> P
+    ) {
+        self.title = Text(title)
+        self.value = value
+        self.dot = dot
+        self.choices = choices
+        self.picker = picker
+    }
+
+    var body: some View {
+        #if os(tvOS)
+        Button {
+            showOptions = true
+        } label: {
+            HStack(spacing: 18) {
+                if let dot {
+                    Circle().fill(dot).frame(width: 14, height: 14)
+                }
+                title
+                Spacer(minLength: 24)
+                if let value {
+                    Text(value).foregroundStyle(.secondary)
+                }
+            }
+        }
+        .sheet(isPresented: $showOptions) {
+            VStack(alignment: .leading, spacing: 28) {
+                title.font(.title2.weight(.bold))
+                ScrollView {
+                    VStack(spacing: 12) {
+                        ForEach(choices) { choice in
+                            Button {
+                                choice.select()
+                                showOptions = false
+                            } label: {
+                                HStack {
+                                    Text(choice.label)
+                                    Spacer()
+                                    if choice.isSelected {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                                .frame(maxWidth: .infinity)
+                            }
+                        }
+                    }
+                    .padding(.vertical, 12)
+                }
+                .scrollClipDisabled()
+            }
+            .padding(60)
+            .frame(width: 900)
+            .frame(maxHeight: 820)
+        }
+        #else
+        picker()
         #endif
     }
 }

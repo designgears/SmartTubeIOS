@@ -71,6 +71,8 @@ public struct AppSettings: Codable {
     /// today with no lock. Never stores the raw PIN.
     public var settingsPINHash: String?
     public var hideShorts: Bool
+    /// tvOS Home: show the large featured-video banner above the shelves.
+    public var showHomeHero: Bool
     public var hideLiveShorts: Bool
     public var hideVideoPremieres: Bool
     /// When `true` (default), a per-device `visitorData` token is included in home-feed
@@ -282,6 +284,7 @@ public struct AppSettings: Codable {
         disableAnalytics = false
         settingsPINHash = nil
         hideShorts = false
+        showHomeHero = true
         hideLiveShorts = false
         hideVideoPremieres = false
         perDeviceRecommendationsEnabled = true
@@ -372,6 +375,7 @@ extension AppSettings {
         case disableAnalytics
         case settingsPINHash
         case hideShorts
+        case showHomeHero
         case hideLiveShorts
         case hideVideoPremieres
         case perDeviceRecommendationsEnabled
@@ -428,6 +432,7 @@ extension AppSettings {
         disableAnalytics = c.safeDecode(Bool.self, forKey: .disableAnalytics, default: d.disableAnalytics)
         settingsPINHash = c.safeDecode(String?.self, forKey: .settingsPINHash, default: d.settingsPINHash)
         hideShorts = c.safeDecode(Bool.self, forKey: .hideShorts, default: d.hideShorts)
+        showHomeHero = c.safeDecode(Bool.self, forKey: .showHomeHero, default: d.showHomeHero)
         hideLiveShorts = c.safeDecode(Bool.self, forKey: .hideLiveShorts, default: d.hideLiveShorts)
         hideVideoPremieres = c.safeDecode(Bool.self, forKey: .hideVideoPremieres, default: d.hideVideoPremieres)
         perDeviceRecommendationsEnabled = c.safeDecode(

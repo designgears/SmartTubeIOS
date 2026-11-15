@@ -117,7 +117,7 @@ final class HomeFeedAndSettingsUITests: XCTestCase {
 
     func testPlayerSectionVisible() {
         openSettings()
-        let speedRow = app.cells.containing(.staticText, identifier: "Playback Speed").firstMatch
+        let speedRow = app.cells.containing(.staticText, identifier: "Default Playback Speed").firstMatch
         XCTAssertTrue(
             speedRow.waitForExistence(timeout: 5),
             "'Playback Speed' row must be visible in the Player section")

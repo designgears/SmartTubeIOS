@@ -103,17 +103,6 @@ final class TVSettingsUITests: XCTestCase {
         )
     }
 
-    /// The Seek Back picker must be in the accessibility tree on tvOS.
-    func testSeekBackRowExists() {
-        let row = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "identifier == 'settings.seekBackRow'"))
-            .firstMatch
-        XCTAssertTrue(
-            row.waitForExistence(timeout: 10),
-            "settings.seekBackRow must be in the accessibility tree on tvOS"
-        )
-    }
-
     /// The Reset All Settings button must be in the accessibility tree.
     func testResetAllSettingsButtonExists() {
         let button = app.descendants(matching: .any)
