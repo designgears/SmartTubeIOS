@@ -439,7 +439,8 @@ extension InnerTubeAPI {
                 if let lockup = dict["lockupViewModel"] as? [String: Any],
                     lockup["contentType"] as? String == "LOCKUP_CONTENT_TYPE_PLAYLIST",
                     let id = lockup["contentId"] as? String,
-                    let title = ((lockup["metadata"] as? [String: Any])?["lockupMetadataViewModel"]
+                    let title =
+                        ((lockup["metadata"] as? [String: Any])?["lockupMetadataViewModel"]
                         as? [String: Any])?["title"] as? [String: Any],
                     let text = title["content"] as? String
                 {
