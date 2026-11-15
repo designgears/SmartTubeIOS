@@ -91,6 +91,26 @@ extension PlaybackViewModel {
                 // blocking the end-of-video / autoplay-next flow (crash log confirmed
                 // via Crashlytics: stall #1–4 at t=15s for a 15.3 s video).
                 let nearEnd = self.duration > 0 && self.currentTime >= self.duration - 1.0
+                #if os(tvOS)
+                // On tvOS the native AVPlayerViewController is the control surface: its
+                // play/pause drive the AVPlayer directly, bypassing pause()/resume(). Mirror
+                // that state instead of treating a remote-control pause as a stall — the
+                // stall recovery below would un-pause it after 2 s, and three pauses within
+                // 30 s escalated to exhaustiveRetry, which reloaded the video from 0:00.
+                // Real stalls still arrive through playbackStalledNotification.
+                if !self.isSwappingItem, !self.isHandlingAudioInterruption {
+                    if newRate == 0, self.isPlaying, !nearEnd {
+                        self.isPlaying = false
+                        self.updateNowPlayingPlayback()
+                        return
+                    }
+                    if newRate != 0, !self.isPlaying {
+                        self.isPlaying = true
+                        self.updateNowPlayingPlayback()
+                        return
+                    }
+                }
+                #endif
                 let playerWentSilent =
                     newRate == 0 && self.isPlaying && !self.isSwappingItem && !self.isHandlingAudioInterruption
                     && !nearEnd
