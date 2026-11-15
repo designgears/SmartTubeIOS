@@ -863,9 +863,9 @@ extension PlayerControlsOverlay {
     // MARK: - Quick-access label helpers
 
     private var speedLabel: String {
-        store.settings.playbackSpeed == 1.0
+        vm.currentPlaybackSpeed == 1.0
             ? "Normal"
-            : String(format: "%.2g", store.settings.playbackSpeed) + "×"
+            : String(format: "%.2g", vm.currentPlaybackSpeed) + "×"
     }
 
     private var qualityLabel: String {

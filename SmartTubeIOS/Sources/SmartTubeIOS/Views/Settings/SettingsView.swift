@@ -142,6 +142,13 @@ public struct SettingsView: View {
                     Text(s == 1.0 ? "Normal" : "\(s, specifier: "%.2g")×").tag(s)
                 }
             }
+            if !store.settings.channelPlaybackSpeeds.isEmpty {
+                // Speeds are remembered per channel when changed in the player (never for music).
+                Button("Forget Channel Speeds (\(store.settings.channelPlaybackSpeeds.count))") {
+                    store.settings.channelPlaybackSpeeds = [:]
+                }
+                .accessibilityIdentifier("settings.forgetChannelSpeedsButton")
+            }
 
             #if !os(iOS)
             Picker("Default Quality", selection: $store.settings.preferredQuality) {

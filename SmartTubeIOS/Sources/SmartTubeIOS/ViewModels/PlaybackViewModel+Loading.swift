@@ -71,6 +71,7 @@ extension PlaybackViewModel {
             wkHLSEarlyTaskVideoId = nil
             #endif
             currentVideo = video
+            applyEffectiveSpeed()
             isLoading = false
             isPlaying = false
             videoEnded = false
@@ -164,6 +165,8 @@ extension PlaybackViewModel {
             history.append(prev)
         }
         currentVideo = video
+        // Per-channel speed memory: start at this channel's remembered speed (or 1× for music).
+        applyEffectiveSpeed()
         // fix236: Record the intended video at load() time so checkWrongVideoOnFirstPlay()
         // can detect if a stale task swaps currentVideo before readyToPlay fires.
         intendedVideoId = video.id

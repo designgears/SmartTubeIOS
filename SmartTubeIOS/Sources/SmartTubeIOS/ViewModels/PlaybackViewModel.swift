@@ -31,7 +31,13 @@ public final class PlaybackViewModel {
 
     // MARK: - State
 
-    public internal(set) var playerInfo: PlayerInfo?
+    public internal(set) var playerInfo: PlayerInfo? {
+        // A newly parsed response can reveal the channel or that the video is music.
+        didSet { applyEffectiveSpeed() }
+    }
+    /// The user's default speed (Settings › Default Playback Speed). `settings.playbackSpeed`
+    /// holds the *effective* speed for the current video — see `PlaybackViewModel+SpeedMemory`.
+    var defaultPlaybackSpeed: Double = 1.0
     public internal(set) var isLoading: Bool = false {
         didSet { if !isLoading { retryStatusMessage = nil } }
     }
@@ -521,8 +527,10 @@ public final class PlaybackViewModel {
     public var currentVideoId: String? { currentVideo?.id }
 
     public func updateSettings(_ newSettings: AppSettings) {
+        defaultPlaybackSpeed = newSettings.playbackSpeed
         settings = newSettings
         isAudioOnlyMode = newSettings.audioOnlyMode
+        applyEffectiveSpeed()
     }
 }
 

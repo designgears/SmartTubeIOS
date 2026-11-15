@@ -354,9 +354,9 @@ extension PlayerView {
                 Label("Playback Speed", systemImage: "speedometer")
                 Spacer()
                 Text(
-                    store.settings.playbackSpeed == 1.0
+                    vm.currentPlaybackSpeed == 1.0
                         ? "Normal"
-                        : "\(store.settings.playbackSpeed, specifier: "%.2g")×"
+                        : "\(vm.currentPlaybackSpeed, specifier: "%.2g")×"
                 )
                 .foregroundStyle(.secondary)
             }

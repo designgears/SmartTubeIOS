@@ -161,15 +161,18 @@ extension PlayerView {
                     VStack(spacing: 0) {
                         ForEach(AppSettings.availableSpeeds, id: \.self) { (speed: Double) in
                             Button {
-                                store.settings.playbackSpeed = speed
-                                vm.setPlaybackSpeed(speed)
+                                switch vm.userSelectedPlaybackSpeed(speed) {
+                                case .channel(let channelId): store.settings.channelPlaybackSpeeds[channelId] = speed
+                                case .global: store.settings.playbackSpeed = speed
+                                case .sessionOnly: break  // music: never remembered
+                                }
                                 showSpeedPicker = false
                             } label: {
                                 HStack {
                                     Text(speed == 1.0 ? "Normal (1\u{d7})" : "\(speed, specifier: "%.2g")\u{d7}")
                                         .foregroundStyle(.primary)
                                     Spacer()
-                                    if abs(store.settings.playbackSpeed - speed) < 0.01 {
+                                    if abs(vm.currentPlaybackSpeed - speed) < 0.01 {
                                         Image(systemName: AppSymbol.checkmark)
                                             .foregroundStyle(Color.accentColor)
                                     }

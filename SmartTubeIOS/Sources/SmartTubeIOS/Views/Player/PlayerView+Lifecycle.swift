@@ -653,8 +653,8 @@ extension PlayerView {
             #if os(iOS)
             // On iOS, PlayerStateStore.play(video:) already called vm.load() before
             // presenting. Only sync current user preferences; the video is already loading.
-            vm.setPlaybackSpeed(store.settings.playbackSpeed)
             vm.updateSettings(store.settings)
+            vm.setPlaybackSpeed(vm.currentPlaybackSpeed)
             vm.updateAuthToken(authService.accessToken)
             vm.updateSAPISID(authService.sapisid)
             if ProcessInfo.processInfo.arguments.contains("--uitesting-open-more-menu") {
@@ -687,8 +687,8 @@ extension PlayerView {
             } else {
                 vm.load(video: video)
             }
-            vm.setPlaybackSpeed(store.settings.playbackSpeed)
             vm.updateSettings(store.settings)
+            vm.setPlaybackSpeed(vm.currentPlaybackSpeed)
             vm.updateAuthToken(authService.accessToken)
             // UI testing only: force-show controls so the test can find player.nextBtn.
             if ProcessInfo.processInfo.arguments.contains("--uitesting-show-controls") {

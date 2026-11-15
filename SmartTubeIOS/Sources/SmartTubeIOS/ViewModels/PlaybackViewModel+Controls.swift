@@ -101,9 +101,13 @@ extension PlaybackViewModel {
     }
 
     public func setPlaybackSpeed(_ speed: Double) {
-        // Setting player.rate to a non-zero value on a paused AVPlayer restarts
-        // playback — only apply the rate while actively playing.
-        if isPlaying {
+        // `play()` — including play/pause and scrubbing in AVPlayerViewController's native
+        // controls — resumes at `defaultRate`, so keep it in sync or the speed snaps to 1×.
+        player.defaultRate = Float(speed)
+        // Apply now if the player is moving. Check AVPlayer itself, not `isPlaying`: the
+        // native controls can play/pause without that flag tracking it. Setting a non-zero
+        // rate on a paused player would start playback, so paused players keep their rate.
+        if isPlaying || player.rate != 0, !isHoldingToSpeed {
             player.rate = Float(speed)
         }
     }

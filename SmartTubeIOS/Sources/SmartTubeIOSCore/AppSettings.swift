@@ -8,6 +8,8 @@ public struct AppSettings: Codable {
     // MARK: Player
     public var preferredQuality: VideoQuality
     public var playbackSpeed: Double
+    /// Remembered playback speed per channel (channelId → speed). Music is never stored.
+    public var channelPlaybackSpeeds: [String: Double]
     public var autoplayEnabled: Bool
     public var subtitlesLanguage: String?
     public var backgroundPlaybackEnabled: Bool
@@ -257,6 +259,7 @@ public struct AppSettings: Codable {
     public init() {
         preferredQuality = .auto
         playbackSpeed = 1.0
+        channelPlaybackSpeeds = [:]
         autoplayEnabled = true
         subtitlesLanguage = nil
         backgroundPlaybackEnabled = false
@@ -346,6 +349,7 @@ extension AppSettings {
         case settingsVersion
         case preferredQuality
         case playbackSpeed
+        case channelPlaybackSpeeds
         case autoplayEnabled
         case subtitlesLanguage
         case backgroundPlaybackEnabled
@@ -398,6 +402,8 @@ extension AppSettings {
         settingsVersion = c.safeDecode(Int.self, forKey: .settingsVersion, default: 0)
         preferredQuality = c.safeDecode(VideoQuality.self, forKey: .preferredQuality, default: d.preferredQuality)
         playbackSpeed = c.safeDecode(Double.self, forKey: .playbackSpeed, default: d.playbackSpeed)
+        channelPlaybackSpeeds = c.safeDecode(
+            [String: Double].self, forKey: .channelPlaybackSpeeds, default: d.channelPlaybackSpeeds)
         autoplayEnabled = c.safeDecode(Bool.self, forKey: .autoplayEnabled, default: d.autoplayEnabled)
         subtitlesLanguage = c.safeDecode(String?.self, forKey: .subtitlesLanguage, default: d.subtitlesLanguage)
         backgroundPlaybackEnabled = c.safeDecode(
