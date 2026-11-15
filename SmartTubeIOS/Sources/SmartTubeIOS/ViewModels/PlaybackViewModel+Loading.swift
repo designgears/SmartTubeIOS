@@ -7,7 +7,7 @@ import UIKit
 import MediaPlayer
 #endif
 
-private let playerLog = CrashlyticsLogger(category: "Player")
+private let playerLog = DiagnosticsLogger(category: "Player")
 
 // MARK: - Load Video Lifecycle
 
@@ -36,7 +36,7 @@ extension PlaybackViewModel {
             playerLog.notice("[load] already loading \(video.id) — ignoring duplicate call")
             return
         }
-        CrashlyticsLogger.setVideoContext(id: video.id, title: video.title)
+        DiagnosticsLogger.setVideoContext(id: video.id, title: video.title)
         // Cancel any previous in-flight load so we never have two concurrent API
         // fetches for the same (or different) video running at the same time.
         loadTask?.cancel()
@@ -898,7 +898,7 @@ extension PlaybackViewModel {
                             self.lastSuccessfulStreamType = isHLS ? "primaryHLS" : "primaryDirect"
                         }
                         if elapsedMs > 4_000 {
-                            CrashlyticsLogger.recordSlowVideoLoad(
+                            DiagnosticsLogger.recordSlowVideoLoad(
                                 videoId: self.currentVideo?.id ?? "unknown",
                                 elapsedMs: elapsedMs,
                                 streamType: self.lastSuccessfulStreamType,

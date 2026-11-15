@@ -189,7 +189,7 @@ extension ShortsPlayerView {
 
     func loadVideo(at index: Int) {
         let video = videos[index]
-        CrashlyticsLogger.setIntendedVideo(id: video.id, title: video.title)
+        DiagnosticsLogger.setIntendedVideo(id: video.id, title: video.title)
         #if os(iOS)
         vm.updateSettings(store.settings)
         vm.loadShort(video: video)
@@ -261,7 +261,7 @@ extension ShortsPlayerView {
             code: 0,
             userInfo: [NSLocalizedDescriptionKey: "Shorts embed load failure: \(reason) (video \(videoId))"]
         )
-        CrashlyticsLogger(category: "ShortsPlayer").recordNonFatal(
+        DiagnosticsLogger(category: "ShortsPlayer").recordNonFatal(
             nsError,
             userInfo: [
                 "video_id": videoId,

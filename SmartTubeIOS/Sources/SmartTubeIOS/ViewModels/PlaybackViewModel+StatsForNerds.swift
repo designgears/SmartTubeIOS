@@ -2,7 +2,7 @@ import AVFoundation
 import SmartTubeIOSCore
 import os
 
-private let playerLog = CrashlyticsLogger(category: "Player")
+private let playerLog = DiagnosticsLogger(category: "Player")
 
 // MARK: - Stats for Nerds
 
@@ -98,7 +98,7 @@ extension PlaybackViewModel {
             droppedFrames: droppedFrames,
             stalls: stalls,
             pendingQualityLabel: qualityManager.pendingQualityLabel,
-            reportID: CrashlyticsLogger.sessionReportID,
+            reportID: DiagnosticsLogger.sessionReportID,
             timeToPlayMs: timeToPlayMs,
             timeToHighQualityMs: timeToHighQualityMs,
             cacheStatus: cacheStatusSummary,
@@ -154,7 +154,7 @@ public struct StatsForNerdsSnapshot: Sendable {
     public var pendingQualityLabel: String
     /// Session report ID — matches the `report_id` custom key stamped on Crashlytics
     /// reports. Quote this when sending a diagnostic report so the developer can
-    /// locate the exact session in Firebase.
+    /// locate the exact session in the saved diagnostic reports.
     public var reportID: String
     /// Elapsed ms from `load()` to the first `readyToPlay` (low-quality fast-start frame). 0 = not yet measured.
     public var timeToPlayMs: Int
@@ -177,7 +177,7 @@ public struct StatsForNerdsSnapshot: Sendable {
         droppedFrames: 0,
         stalls: 0,
         pendingQualityLabel: "",
-        reportID: CrashlyticsLogger.sessionReportID,
+        reportID: DiagnosticsLogger.sessionReportID,
         timeToPlayMs: 0,
         timeToHighQualityMs: 0,
         cacheStatus: "",

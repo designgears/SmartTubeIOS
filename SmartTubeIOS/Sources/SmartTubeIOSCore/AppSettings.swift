@@ -60,9 +60,8 @@ public struct AppSettings: Codable {
     /// instead restyles the actual on-screen `UITabBar` instance directly. Takes effect
     /// immediately, no restart needed.
     public var disableLiquidGlass: Bool
-    /// #92: when `true`, AppEntry.swift's init() skips `FirebaseApp.configure()` entirely
-    /// so the SDK makes no network calls at launch (fixes a reported startup delay when
-    /// analytics domains are DNS-blocked). Read once at process launch like
+    /// #92: when `true`, local diagnostics (`DiagnosticsLogger` session log + reports) are
+    /// not written. Nothing is ever sent off-device. Read once at process launch like
     /// `disableLiquidGlass` above — takes effect on the *next* launch, not live.
     public var disableAnalytics: Bool
     /// #126: SHA256 hex digest of the Settings-screen parental-control PIN (see

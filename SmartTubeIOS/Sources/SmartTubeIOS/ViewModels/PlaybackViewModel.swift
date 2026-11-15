@@ -9,7 +9,7 @@ import UIKit
 import MediaPlayer
 #endif
 
-private let playerLog = CrashlyticsLogger(category: "Player")
+private let playerLog = DiagnosticsLogger(category: "Player")
 
 // MARK: - PlaybackViewModel
 //
@@ -173,7 +173,7 @@ public final class PlaybackViewModel {
                     "retry_attempts": "\(retryAttempts)",
                     "current_time": "\(Int(currentTime))s",
                 ])
-            CrashlyticsLogger.sendAutoPlaybackDiagnostic()
+            DiagnosticsLogger.sendAutoPlaybackDiagnostic()
         }
     }
     public var controlsVisible: Bool = false
@@ -605,7 +605,7 @@ extension PlaybackViewModel: QualityEventHandler {
             active.id != intended
         else { return }
         playerLog.error("[WrongVideo] MISMATCH at readyToPlay — intended=\(intended) active=\(active.id)")
-        CrashlyticsLogger.sendWrongVideoReport(
+        DiagnosticsLogger.sendWrongVideoReport(
             intendedId: intended,
             intendedTitle: intendedVideoTitle ?? intended,
             activeId: active.id,

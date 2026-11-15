@@ -11,7 +11,7 @@ import WebKit
 
 private typealias VideoFormat = SmartTubeIOSCore.VideoFormat
 
-private let playerLog = CrashlyticsLogger(category: "Player")
+private let playerLog = DiagnosticsLogger(category: "Player")
 
 /// Client-specific HLS settings used for both initial playback and quality changes.
 struct HLSPlaybackPolicy: Equatable, Sendable {
@@ -680,7 +680,7 @@ extension PlaybackViewModel {
                         playerLog.notice("[benchmark] readyToPlay — BotGuardWV/proxy-HLS — videoId=\(video.id)")
                         timeToPlayMs = Int(Date().timeIntervalSince(videoLoadStartedAt) * 1000)
                         if timeToPlayMs > 4_000 {
-                            CrashlyticsLogger.recordSlowVideoLoad(
+                            DiagnosticsLogger.recordSlowVideoLoad(
                                 videoId: video.id,
                                 elapsedMs: timeToPlayMs,
                                 streamType: "BotGuardWV/proxyHLS",
@@ -1332,7 +1332,7 @@ extension PlaybackViewModel {
                 timeToPlayMs = Int(Date().timeIntervalSince(videoLoadStartedAt) * 1000)
                 lastSuccessfulStreamType = label
                 if timeToPlayMs > 4_000 {
-                    CrashlyticsLogger.recordSlowVideoLoad(
+                    DiagnosticsLogger.recordSlowVideoLoad(
                         videoId: video.id,
                         elapsedMs: timeToPlayMs,
                         streamType: label,
@@ -1672,7 +1672,7 @@ extension PlaybackViewModel {
                     isLoading = false
                     timeToPlayMs = Int(Date().timeIntervalSince(videoLoadStartedAt) * 1000)
                     if timeToPlayMs > 4_000 {
-                        CrashlyticsLogger.recordSlowVideoLoad(
+                        DiagnosticsLogger.recordSlowVideoLoad(
                             videoId: video.id,
                             elapsedMs: timeToPlayMs,
                             streamType: "\(label)/adaptive",
@@ -2509,7 +2509,7 @@ extension PlaybackViewModel {
                 timeToPlayMs = Int(Date().timeIntervalSince(videoLoadStartedAt) * 1000)
                 lastSuccessfulStreamType = "webView/HLS"
                 if timeToPlayMs > 4_000 {
-                    CrashlyticsLogger.recordSlowVideoLoad(
+                    DiagnosticsLogger.recordSlowVideoLoad(
                         videoId: video.id,
                         elapsedMs: timeToPlayMs,
                         streamType: "webView/HLS",

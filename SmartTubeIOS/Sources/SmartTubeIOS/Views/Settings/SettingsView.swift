@@ -456,7 +456,7 @@ public struct SettingsView: View {
             }
             #endif
             Button {
-                CrashlyticsLogger.sendDiagnosticReport()
+                DiagnosticsLogger.sendDiagnosticReport()
                 reportSent = true
             } label: {
                 if reportSent {
