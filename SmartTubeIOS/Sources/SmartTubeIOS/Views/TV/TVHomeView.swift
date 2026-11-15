@@ -27,14 +27,13 @@ struct TVHomeView: View {
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: TVLayout.sectionSpacing) {
+                // Banner turned off in Settings: nothing at all — no loader, no reserved space;
+                // Home starts with the shelves.
                 if let hero = heroVideo {
                     TVHeroView(video: hero, focusNamespace: focusNamespace)
-                } else if hasMainContent {
-                    // Banner turned off in Settings: start with the shelves.
-                    Color.clear.frame(height: 110)
-                } else if isInitialLoading {
+                } else if showsHero, isInitialLoading {
                     TVLoadingView().frame(height: 640)
-                } else {
+                } else if !hasMainContent, !isInitialLoading {
                     // Feed failed or came back empty: always leave something focusable.
                     TVMessageView(
                         systemImage: AppSymbol.offline,
@@ -58,6 +57,10 @@ struct TVHomeView: View {
                     }
                 }
 
+                if recommended.isEmpty, !showsHero, isInitialLoading {
+                    // Without the banner, Recommended loads like any other shelf.
+                    TVShelfSkeleton(title: "Recommended")
+                }
                 if !recommended.isEmpty {
                     TVShelf(
                         title: "Recommended", items: recommended, onReachEnd: loadMoreRecommended,
@@ -99,7 +102,8 @@ struct TVHomeView: View {
             }
             .padding(.bottom, 80)
         }
-        .ignoresSafeArea(edges: .top)
+        // Only the banner runs to the top edge; without it the shelves keep the normal margin.
+        .ignoresSafeArea(edges: showsHero ? .top : [])
         .focusScope(focusNamespace)
         .task(id: auth.accessToken) { await start() }
         // After the player closes: refresh history and the local positions so Continue

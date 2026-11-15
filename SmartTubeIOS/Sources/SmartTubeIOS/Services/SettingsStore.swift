@@ -58,6 +58,9 @@ public final class SettingsStore {
         if ProcessInfo.processInfo.arguments.contains("--uitesting-hide-shorts") {
             self.settings.hideShorts = true
         }
+        if ProcessInfo.processInfo.arguments.contains("--uitesting-hide-home-hero") {
+            self.settings.showHomeHero = false
+        }
         if ProcessInfo.processInfo.arguments.contains("--uitesting-enable-tos-player-on-ios") {
             self.useTOSPlayerOnIOS = true
         }
