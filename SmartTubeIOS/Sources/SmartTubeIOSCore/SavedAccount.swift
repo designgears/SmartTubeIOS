@@ -20,6 +20,9 @@ public struct SavedAccount: Codable, Sendable, Identifiable, Equatable {
     public var pageId: String?
     /// A profile with no Google login (UI tests): its own on-device data, signed-out API calls.
     public var localOnly: Bool?
+    /// The account's channels (primary + Brand Accounts), saved whenever the account is active,
+    /// so Who's Watching? can offer each channel as its own profile.
+    public var channels: [YouTubeChannel]?
     public var isLocalOnly: Bool { localOnly == true }
 
     public init(id: String = UUID().uuidString) {
@@ -32,5 +35,53 @@ public struct SavedAccount: Codable, Sendable, Identifiable, Equatable {
     public func isSameGoogleAccount(as other: SavedAccount) -> Bool {
         guard let mine = gaiaId, let theirs = other.gaiaId else { return false }
         return mine == theirs
+    }
+}
+
+// MARK: - AccountProfile
+
+/// One entry on Who's Watching?: a Google account's channel (primary or Brand Account).
+/// Each profile has its own on-device data (`slot`) and YouTube session.
+public struct AccountProfile: Identifiable, Equatable, Sendable {
+    public let accountId: String
+    /// nil = the account's primary channel.
+    public let pageId: String?
+    public let name: String
+    public let avatarURL: URL?
+
+    public init(accountId: String, pageId: String?, name: String, avatarURL: URL?) {
+        self.accountId = accountId
+        self.pageId = pageId
+        self.name = name
+        self.avatarURL = avatarURL
+    }
+
+    public var id: String { Self.slot(accountId: accountId, pageId: pageId) }
+
+    /// AccountScope slot. The primary channel uses the bare account id (data saved before
+    /// channels were profiles stays with it); Brand channels get their own slot.
+    public static func slot(accountId: String, pageId: String?) -> String {
+        pageId.map { "\(accountId).channel.\($0)" } ?? accountId
+    }
+
+    /// The profiles an account offers: one per known channel, or a single profile when its
+    /// channels aren't known yet (it hasn't been active since channels were saved).
+    public static func profiles(
+        for account: SavedAccount, liveChannels: [YouTubeChannel]? = nil
+    )
+        -> [AccountProfile]
+    {
+        let channels = (liveChannels?.isEmpty == false ? liveChannels : account.channels) ?? []
+        guard channels.count > 1 else {
+            return [
+                AccountProfile(
+                    accountId: account.id, pageId: nil,
+                    name: account.primaryName ?? account.displayName ?? "Account",
+                    avatarURL: channels.first?.avatarURL ?? account.displayAvatarURL)
+            ]
+        }
+        return channels.map {
+            AccountProfile(accountId: account.id, pageId: $0.pageId, name: $0.name, avatarURL: $0.avatarURL)
+        }
     }
 }

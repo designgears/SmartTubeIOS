@@ -17,27 +17,31 @@ struct TVAccountsView: View {
             VStack(alignment: .leading, spacing: 16) {
                 TVPageHeader(
                     title: auth.savedAccounts.isEmpty ? "Sign In" : "Who's Watching?",
-                    subtitle: auth.savedAccounts.count > 1
-                        ? "Your feed, history and subscriptions follow the account you pick."
+                    subtitle: auth.profiles.count > 1
+                        ? "Every channel keeps its own feed, history and settings."
                         : "Add more accounts to switch between them here."
                 )
                 LazyVGrid(
                     columns: [GridItem(.adaptive(minimum: 250, maximum: 290), spacing: 40, alignment: .top)],
                     spacing: 56
                 ) {
-                    ForEach(auth.savedAccounts) { account in
-                        let isCurrent = account.id == auth.activeAccountId && auth.isSignedIn
+                    // One card per channel (primary and Brand Accounts) of every signed-in account.
+                    ForEach(auth.profiles) { profile in
+                        let isCurrent = profile.id == auth.activeProfileId
                         TVChannelCard(
-                            title: account.displayName ?? account.primaryName ?? "Account",
-                            thumbnailURL: account.displayAvatarURL,
+                            title: profile.name,
+                            thumbnailURL: profile.avatarURL,
                             subtitle: isCurrent ? "Current" : nil
                         ) {
-                            if !isCurrent { auth.switchAccount(to: account.id) }
+                            if !isCurrent { auth.switchProfile(profile) }
                             navigator.selection = .home
                         }
                         .contextMenu {
-                            Button("Sign Out", systemImage: AppSymbol.signOut, role: .destructive) {
-                                auth.removeAccount(account.id)
+                            Button(
+                                "Sign Out of \(accountName(profile.accountId))", systemImage: AppSymbol.signOut,
+                                role: .destructive
+                            ) {
+                                auth.removeAccount(profile.accountId)
                             }
                         }
                     }
@@ -69,6 +73,14 @@ struct TVAccountsView: View {
             },
             content: { SignInView() }
         )
+    }
+}
+
+extension TVAccountsView {
+    /// The Google account's own name: Sign Out removes all of its channels.
+    fileprivate func accountName(_ accountId: String) -> String {
+        let account = auth.savedAccounts.first { $0.id == accountId }
+        return account?.primaryName ?? account?.displayName ?? "Account"
     }
 }
 

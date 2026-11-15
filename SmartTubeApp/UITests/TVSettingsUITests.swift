@@ -242,6 +242,14 @@ final class TVAccountSwitchUITests: XCTestCase {
         snapshot("7-switched-to-guest")
         openWhosWatching(in: app, sidebarOpen: true)
         snapshot("8-whos-watching-guest")
+
+        // 5. A Brand channel is its own profile: Alex's "Alex Kids" card.
+        XCTAssertTrue(element("Alex Kids", in: app).exists, "each channel of an account is a profile")
+        XCTAssertTrue(focus("Alex Kids", in: app, pressing: .right), "Alex Kids card")  // focus starts on the first card
+        remote.press(.select)
+        hold(5)
+        openWhosWatching(in: app, sidebarOpen: true)
+        snapshot("9-whos-watching-alex-kids")
     }
 }
 

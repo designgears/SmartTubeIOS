@@ -11,13 +11,18 @@ extension AuthService {
 
     /// Switches every InnerTube request to `channel`. The OAuth token stays the primary
     /// account's; only `X-Goog-Pageid` changes, so no new sign-in is needed.
+    /// Each channel is its own profile: switching channel is a full profile switch (players
+    /// stop first, the channel's own on-device data and a fresh YouTube session), and the
+    /// account remembers the channel for next time.
     public func selectChannel(_ channel: YouTubeChannel) {
         guard channel.pageId != activePageId else { return }
         authLog.notice("selectChannel() — \(channel.isPrimary ? "primary" : "brand account")")
-        setActivePageId(channel.pageId)
+        beginAccountChange()
+        setActivePageId(channel.pageId, notify: false)
         accountName = channel.name
         accountAvatarURL = channel.avatarURL
         saveToKeychain()
+        syncAccountScope()  // also for profiles rememberActiveAccount skips (no tokens)
     }
 
     /// accounts_list is only fetched at sign-in, so the list is empty after a relaunch.
@@ -35,6 +40,7 @@ extension AuthService {
         if let pageId = activePageId, !list.contains(where: { $0.pageId == pageId }) {
             authLog.notice("applyChannels() — stored Brand Account not found, back to primary")
             setActivePageId(nil)
+            syncAccountScope()  // the primary channel is a different profile
         }
     }
 

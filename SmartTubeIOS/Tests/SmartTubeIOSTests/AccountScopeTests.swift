@@ -84,6 +84,21 @@ extension ActiveChannelSuites {
             #expect(!AccountScope.hasSavedData("A", defaults: defaults))
         }
 
+        @Test func forgetRemovesEveryChannelProfileOfTheAccount() {
+            let defaults = makeDefaults()
+            for slot in ["A", "A.channel.p1", "A.channel.p2", "B"] {
+                defaults.set(Data(slot.utf8), forKey: AccountScope.slotKey(key, slot: slot))
+            }
+            defaults.set("B", forKey: AccountScope.currentSlotKey)
+
+            AccountScope.forget("A", defaults: defaults)
+
+            #expect(!AccountScope.hasSavedData("A", defaults: defaults))
+            #expect(!AccountScope.hasSavedData("A.channel.p1", defaults: defaults))
+            #expect(!AccountScope.hasSavedData("A.channel.p2", defaults: defaults))
+            #expect(AccountScope.hasSavedData("B", defaults: defaults))
+        }
+
         @Test func forgetNeverDeletesTheLiveAccount() {
             let defaults = makeDefaults()
             defaults.set(Data("A-parked".utf8), forKey: AccountScope.slotKey(key, slot: "A"))

@@ -35,6 +35,27 @@ struct SavedAccountTests {
         #expect(!account(primary: "").isSameGoogleAccount(as: account(primary: "")))
     }
 
+    @Test func eachChannelIsItsOwnProfile() {
+        var saved = account(gaia: "1", primary: "Aunt")
+        saved.channels = [
+            YouTubeChannel(name: "Aunt", avatarURL: nil, pageId: nil),
+            YouTubeChannel(name: "Aunt's Garden", avatarURL: nil, pageId: "p1"),
+            YouTubeChannel(name: "Aunt's Recipes", avatarURL: nil, pageId: "p2"),
+        ]
+        let profiles = AccountProfile.profiles(for: saved)
+        #expect(profiles.map(\.name) == ["Aunt", "Aunt's Garden", "Aunt's Recipes"])
+        // Primary keeps the bare account id as its data slot; Brand channels get their own.
+        #expect(profiles.map(\.id) == [saved.id, "\(saved.id).channel.p1", "\(saved.id).channel.p2"])
+    }
+
+    @Test func accountWithoutKnownChannelsIsOneProfile() {
+        let saved = account(gaia: "1", primary: "Me")
+        let profiles = AccountProfile.profiles(for: saved)
+        #expect(profiles.count == 1)
+        #expect(profiles.first?.id == saved.id)
+        #expect(profiles.first?.name == "Me")
+    }
+
     @Test func roundTripsThroughJSON() throws {
         var saved = account(gaia: "42", primary: "Bob")
         saved.refreshToken = "r"

@@ -6,7 +6,7 @@ import Foundation
 // The OAuth token always belongs to the primary account; a Brand Account is selected per
 // request via `X-Goog-Pageid` (see ActiveChannel), mirroring SmartTube Android.
 
-public struct YouTubeChannel: Sendable, Hashable, Identifiable {
+public struct YouTubeChannel: Sendable, Hashable, Identifiable, Codable {
     public let name: String
     public let avatarURL: URL?
     /// nil for the primary account.

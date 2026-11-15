@@ -85,11 +85,14 @@ public enum AccountScope {
         return true
     }
 
-    /// Deletes a removed account's parked data.
+    /// Deletes a removed account's parked data — every channel profile of it.
     public static func forget(_ accountId: String, defaults: UserDefaults = .standard) {
-        guard accountId != defaults.string(forKey: currentSlotKey) else { return }
-        let suffix = "#account.\(accountId)"
-        for key in defaults.dictionaryRepresentation().keys where key.hasSuffix(suffix) {
+        let live = defaults.string(forKey: currentSlotKey)
+        let exact = "#account.\(accountId)"
+        let channelPrefix = "#account.\(accountId).channel."
+        for key in defaults.dictionaryRepresentation().keys {
+            guard key.hasSuffix(exact) || key.contains(channelPrefix) else { continue }
+            if let live, key.hasSuffix("#account.\(live)") { continue }  // never the live profile
             defaults.removeObject(forKey: key)
         }
     }

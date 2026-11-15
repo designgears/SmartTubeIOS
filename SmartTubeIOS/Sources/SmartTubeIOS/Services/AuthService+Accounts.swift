@@ -20,12 +20,40 @@ extension AuthService {
         NotificationCenter.default.post(name: AccountScope.willChangeNotification, object: nil)
     }
 
+    /// Every profile on Who's Watching?: one per channel of each signed-in account.
+    public var profiles: [AccountProfile] {
+        savedAccounts.flatMap { account in
+            AccountProfile.profiles(for: account, liveChannels: account.id == activeAccountId ? channels : nil)
+        }
+    }
+
+    /// The active profile's id (AccountScope slot), nil for Guest.
+    public var activeProfileId: String? {
+        guard isSignedIn, let activeAccountId else { return nil }
+        return AccountProfile.slot(accountId: activeAccountId, pageId: activePageId)
+    }
+
+    /// Switches to a profile: another account (on the given channel), or another channel of
+    /// the active account. Either way it's a full switch — own data, fresh YouTube session.
+    public func switchProfile(_ profile: AccountProfile) {
+        guard profile.id != activeProfileId else { return }
+        if isSignedIn, profile.accountId == activeAccountId {
+            let channel =
+                channels.first { $0.pageId == profile.pageId }
+                ?? YouTubeChannel(name: profile.name, avatarURL: profile.avatarURL, pageId: profile.pageId)
+            selectChannel(channel)
+        } else {
+            switchAccount(to: profile.accountId, pageId: .some(profile.pageId))
+        }
+    }
+
     public var activeAccount: SavedAccount? {
         savedAccounts.first { $0.id == activeAccountId }
     }
 
-    /// Switches to another signed-in account.
-    public func switchAccount(to id: String) {
+    /// Switches to another signed-in account, on `pageId` when given (`.some(nil)` = primary
+    /// channel), otherwise on the channel it last used.
+    public func switchAccount(to id: String, pageId requestedPageId: String?? = .none) {
         guard id != activeAccountId || !isSignedIn,
             let target = savedAccounts.first(where: { $0.id == id })
         else { return }
@@ -42,8 +70,10 @@ extension AuthService {
         activeAccountId = target.id
         refreshToken = target.refreshToken
         tokenExpiry = target.tokenExpiry
-        accountName = target.displayName
-        accountAvatarURL = target.displayAvatarURL
+        let pageId = requestedPageId ?? target.pageId
+        let channel = target.channels?.first { $0.pageId == pageId }
+        accountName = channel?.name ?? target.displayName
+        accountAvatarURL = channel?.avatarURL ?? target.displayAvatarURL
         sapisid = target.sapisid
         gaiaId = target.gaiaId
         // An expired access token is dropped; scheduleProactiveRefresh() refreshes at once.
@@ -55,7 +85,7 @@ extension AuthService {
         isSignedIn = refreshToken != nil || accessToken != nil || target.isLocalOnly
         // No channel-change notification: feeds reload on AccountScope's didChange, once the
         // incoming account's on-device data is live.
-        setActivePageId(target.pageId, notify: false)
+        setActivePageId(pageId, notify: false)
         let sapisidValue = target.sapisid
         Task { await tokenManager.setSAPISID(sapisidValue) }
         saveToKeychain()
@@ -133,7 +163,13 @@ extension AuthService {
             account.localOnly = true
             return account
         }
-        savedAccounts = [profile("uitest-alex", "Alex"), profile("uitest-sam", "Sam")]
+        var alex = profile("uitest-alex", "Alex")
+        // Alex also has a Brand channel, so channel profiles can be exercised.
+        alex.channels = [
+            YouTubeChannel(name: "Alex", avatarURL: nil, pageId: nil),
+            YouTubeChannel(name: "Alex Kids", avatarURL: nil, pageId: "uitest-kids"),
+        ]
+        savedAccounts = [alex, profile("uitest-sam", "Sam")]
         let prefix = "--uitesting-fake-account-active="
         let activeId = args.first { $0.hasPrefix(prefix) }.map { String($0.dropFirst(prefix.count)) } ?? "uitest-alex"
         if let active = savedAccounts.first(where: { $0.id == activeId }) {
@@ -163,6 +199,7 @@ extension AuthService {
             entry.primaryName = accountName
         }
         if let gaiaId { entry.gaiaId = gaiaId }
+        if !channels.isEmpty { entry.channels = channels }
         entry.accessToken = accessToken
         entry.refreshToken = refreshToken
         entry.tokenExpiry = tokenExpiry
@@ -197,8 +234,9 @@ extension AuthService {
     func syncAccountScope() {
         // While adding an account the previous one stays live until the new one signs in.
         if activeAccountId == nil, accountToRestoreOnCancel != nil { return }
-        let accountId = isSignedIn ? activeAccountId : nil
-        Task { @MainActor in await AccountScope.activate(accountId) }
+        // Each channel of an account is its own profile (primary = the bare account id).
+        let slot = activeProfileId
+        Task { @MainActor in await AccountScope.activate(slot) }
     }
 
     func loadSavedAccounts() {

@@ -130,11 +130,9 @@ public struct SettingsView: View {
                     LabeledContent("Channel", value: auth.activeChannel?.name ?? "")
                 }
                 .accessibilityIdentifier("settings.channelLink")
-                // Multi-account: other accounts signed in on this device.
-                ForEach(auth.savedAccounts.filter { $0.id != auth.activeAccountId }) { account in
-                    Button("Switch to \(account.displayName ?? account.primaryName ?? "Account")") {
-                        auth.switchAccount(to: account.id)
-                    }
+                // Multi-account: every other profile (channels of each signed-in account).
+                ForEach(auth.profiles.filter { $0.id != auth.activeProfileId }) { profile in
+                    Button("Switch to \(profile.name)") { auth.switchProfile(profile) }
                 }
                 Button("Add Account") {
                     auth.prepareToAddAccount()
@@ -146,11 +144,9 @@ public struct SettingsView: View {
                     .accessibilityIdentifier("settings.useAsGuestButton")
                 Button("Sign Out of \(auth.accountName ?? "This Account")", role: .destructive) { auth.signOut() }
             } else {
-                // Guest: accounts signed in on this device are still one tap away.
-                ForEach(auth.savedAccounts) { account in
-                    Button("Switch to \(account.displayName ?? account.primaryName ?? "Account")") {
-                        auth.switchAccount(to: account.id)
-                    }
+                // Guest: profiles signed in on this device are still one tap away.
+                ForEach(auth.profiles) { profile in
+                    Button("Switch to \(profile.name)") { auth.switchProfile(profile) }
                 }
                 Button(auth.savedAccounts.isEmpty ? "Sign in with Google" : "Add Account") { showSignIn = true }
                     .accessibilityIdentifier("settings.signInButton")

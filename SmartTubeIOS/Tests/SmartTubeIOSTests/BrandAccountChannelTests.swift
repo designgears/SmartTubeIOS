@@ -234,15 +234,16 @@ extension ActiveChannelSuites {
         private func countChannelChanges(during action: () -> Void) -> Int {
             let counter = NotificationCounter()
             let token = NotificationCenter.default.addObserver(
-                forName: .activeChannelDidChange, object: nil, queue: nil
+                // A channel is its own profile: switching is announced like an account switch.
+                forName: AccountScope.willChangeNotification, object: nil, queue: nil
             ) { _ in counter.count += 1 }
             action()
             NotificationCenter.default.removeObserver(token)
             return counter.count
         }
 
-        // deve disparar activeChannelDidChange ao trocar para um Brand Account diferente do ativo
-        @Test("should post activeChannelDidChange when switching to a different Brand Account")
+        // deve iniciar uma troca de perfil ao trocar para um Brand Account diferente do ativo
+        @Test("should start a profile switch when switching to a different Brand Account")
         func postsChangeOnSwitch() {
             let auth = AuthService()
             auth.applyChannels([primary, brand])
@@ -254,8 +255,8 @@ extension ActiveChannelSuites {
             #expect(auth.activePageId == brand.pageId)
         }
 
-        // não deve disparar activeChannelDidChange ao selecionar o canal que já está ativo
-        @Test("should not post activeChannelDidChange when selecting the already active channel")
+        // não deve iniciar uma troca de perfil ao selecionar o canal que já está ativo
+        @Test("should not start a profile switch when selecting the already active channel")
         func skipsChangeForActiveChannel() {
             let auth = AuthService()
             auth.applyChannels([primary, brand])
