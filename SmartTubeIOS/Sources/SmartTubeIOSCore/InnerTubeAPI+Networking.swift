@@ -42,6 +42,23 @@ extension InnerTubeAPI {
     /// before its JS-less VisionOS player request. The watch-page response seeds
     /// youtube.com cookies and exposes visitorData required to avoid false
     /// `LOGIN_REQUIRED` bot-detection responses on otherwise public videos.
+    /// How long a seeded session is reused before fetching a fresh watch page.
+    static let visionOSSessionLifetime: TimeInterval = 30 * 60
+
+    /// Whether a seeded VisionOS session is still fresh (and visitorData survived, e.g. no
+    /// network-path change cleared it).
+    var hasFreshVisionOSSession: Bool {
+        guard visitorData != nil, let at = visionOSSessionSeededAt else { return false }
+        return Date().timeIntervalSince(at) < Self.visionOSSessionLifetime
+    }
+
+    /// Seeds the session ahead of the first play (e.g. when Home appears) so the first
+    /// video doesn't pay for the watch-page round-trip.
+    public func warmVisionOSSession(videoId: String) async {
+        guard !hasFreshVisionOSSession else { return }
+        await seedVisionOSSession(videoId: videoId)
+    }
+
     func seedVisionOSSession(videoId: String) async {
         var components = URLComponents(string: "https://www.youtube.com/watch")!
         components.queryItems = [
@@ -75,6 +92,7 @@ extension InnerTubeAPI {
 
         if let value = extractYouTubeVisitorData(from: html) {
             visitorData = value
+            visionOSSessionSeededAt = Date()
             tubeLog.notice("VisionOS session seeded (visitorData len=\(value.count, privacy: .public))")
             return
         }

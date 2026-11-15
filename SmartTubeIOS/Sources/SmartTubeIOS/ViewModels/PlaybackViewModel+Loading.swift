@@ -409,6 +409,13 @@ extension PlaybackViewModel {
         // thereafter (TTL ~12 h). The 2 s timeout is a safety net for slow networks only.
         let capturedAPI = api
         let capturedVideoId = video.id
+        #if os(tvOS)
+        // tvOS plays via VisionOS HLS, which needs no PO token: mint in the background
+        // (for later fallbacks) instead of holding up the first frame.
+        if !(await api.hasPoToken(for: video.id)) {
+            Task { await capturedAPI.prefetchPoToken(for: capturedVideoId) }
+        }
+        #else
         if !(await api.hasPoToken(for: video.id)) {
             await withTaskGroup(of: Void.self) { group in
                 group.addTask { await capturedAPI.prefetchPoToken(for: capturedVideoId) }
@@ -417,6 +424,7 @@ extension PlaybackViewModel {
                 group.cancelAll()
             }
         }
+        #endif
         #if canImport(WebKit)
         // Fire-and-forget: start WKWebView BotGuard pipeline in the background.
         // Takes 3–8 s; by the time the primary attempt fails and exhaustiveRetry runs,

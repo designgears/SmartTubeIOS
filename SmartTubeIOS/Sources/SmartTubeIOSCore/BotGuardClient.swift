@@ -63,6 +63,11 @@ public final class BotGuardClient: PoTokenProvider, @unchecked Sendable {
     // sequentially per video so concurrent mutation is benign in practice.
     nonisolated(unsafe) private var cachedPoToken: String?
     nonisolated(unsafe) private var cachedPoTokenExpiry: Date?
+    /// Set when BotGuard rejects this JS environment (no getMinter). That verdict does not
+    /// change between videos, so re-running the ~0.3–0.5 s pipeline on every load only
+    /// delays playback. Retried after `rejectionRetryInterval`.
+    nonisolated(unsafe) private var environmentRejectedUntil: Date?
+    private static let rejectionRetryInterval: TimeInterval = 30 * 60
 
     /// Set at the end of mintSync so callers can inspect which path was taken after await token(for:).
     nonisolated(unsafe) public private(set) var lastRunHasMinter: Bool = false
@@ -89,6 +94,9 @@ public final class BotGuardClient: PoTokenProvider, @unchecked Sendable {
             return cached
         }
 
+        if !DebugFlags.cachingDisabled, let until = environmentRejectedUntil, Date() < until {
+            throw BotGuardError.mintFailed("environment rejected earlier — skipping until retry window")
+        }
 
         bgLog.notice("[BotGuard] token requested for \(videoId, privacy: .public)")
 
@@ -648,6 +656,7 @@ public final class BotGuardClient: PoTokenProvider, @unchecked Sendable {
             bgLog.notice(
                 "[BotGuard] no getMinter (non-browser environment) — refusing websafe fallback (len=\(websafeFallback?.count ?? 0))"
             )
+            environmentRejectedUntil = Date().addingTimeInterval(Self.rejectionRetryInterval)
             throw BotGuardError.mintFailed("getMinter not set — BotGuard rejected this JS environment")
         }
 
