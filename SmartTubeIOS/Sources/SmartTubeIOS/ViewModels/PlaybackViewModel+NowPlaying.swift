@@ -140,6 +140,10 @@ extension PlaybackViewModel {
         guard let video else {
             nowPlayingInfoCache = [:]
             setNowPlayingInfo(nil)
+            // Nothing playing: no next/previous either (don't leave a previous video's state).
+            let center = MPRemoteCommandCenter.shared()
+            center.nextTrackCommand.isEnabled = false
+            center.previousTrackCommand.isEnabled = false
             return
         }
         var info: [String: Any] = [
