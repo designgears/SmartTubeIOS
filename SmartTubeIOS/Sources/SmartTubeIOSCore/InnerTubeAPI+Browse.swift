@@ -382,63 +382,50 @@ extension InnerTubeAPI {
 
     // MARK: - Category sections
 
-    public func fetchMusic() async throws -> VideoGroup {
+    // YouTube's category destinations are now channel pages (Music, Live, Sports, News)
+    // browsed with the WEB client. The old TVHTML5 FEmusic_home / FEgaming / FElive_home /
+    // FEsportsau browse IDs return HTTP 400 (verified 2026-11-15), and the TV client only
+    // returns playlist tiles for these channels. Gaming has no video destination any more.
+    enum CategoryChannel {
+        static let music = "UC-9-kyTW8ZkZNDHQJ6FgpwQ"
+        static let live = "UC4R8DWoMoI7CAwX8_LjQHig"
+        static let sports = "UCEgdi0XIXXZ-qJOFPf4JSKw"
+        static let news = "UCYfdidRxbB8Qhf0Nx7ioOYw"
+    }
+
+    /// Browses a category channel page, falling back to a search when it yields no videos.
+    func fetchCategory(_ title: String, channelId: String, fallbackQuery: String) async throws -> VideoGroup {
         do {
-            // FEmusic_home is the TVHTML5 browse ID for the music category page.
-            var body = makeBody(client: tvClientContext)
-            body["browseId"] = "FEmusic_home"
-            let data = try await postTVCategory(endpoint: "browse", body: body)
-            let group = try parseVideoGroup(from: data, title: "Music")
+            var body = makeBody(client: webClientContext)
+            body["browseId"] = channelId
+            let data = try await post(endpoint: "browse", body: body)
+            let group = try parseVideoGroup(from: data, title: title)
             if !group.videos.isEmpty { return group }
+            tubeLog.notice("fetchCategory \(title, privacy: .public): no videos on channel page — searching")
         } catch {
-            tubeLog.notice("fetchMusic browse failed, falling back to search: \(error, privacy: .public)")
+            tubeLog.notice(
+                "fetchCategory \(title, privacy: .public) browse failed, searching: \(error, privacy: .public)")
         }
-        return try await search(query: "music")
+        return try await search(query: fallbackQuery)
+    }
+
+    public func fetchMusic() async throws -> VideoGroup {
+        try await fetchCategory("Music", channelId: CategoryChannel.music, fallbackQuery: "music")
     }
 
     public func fetchGaming() async throws -> VideoGroup {
-        do {
-            // FEgaming requires TVHTML5 context on www.youtube.com (not googleapis.com).
-            var body = makeBody(client: tvClientContext)
-            body["browseId"] = "FEgaming"
-            let data = try await postTVCategory(endpoint: "browse", body: body)
-            let group = try parseVideoGroup(from: data, title: "Gaming")
-            if !group.videos.isEmpty { return group }
-        } catch {
-            tubeLog.notice("fetchGaming browse failed, falling back to search: \(error, privacy: .public)")
-        }
-        return try await search(query: "gaming")
+        try await search(query: "gaming")
     }
 
     public func fetchNews() async throws -> VideoGroup {
-        // FEnews is not a valid InnerTube browse ID — use search directly.
-        return try await search(query: "news today")
+        try await fetchCategory("News", channelId: CategoryChannel.news, fallbackQuery: "news today")
     }
 
     public func fetchLive() async throws -> VideoGroup {
-        do {
-            var body = makeBody(client: tvClientContext)
-            body["browseId"] = "FElive_home"
-            let data = try await postTVCategory(endpoint: "browse", body: body)
-            let group = try parseVideoGroup(from: data, title: "Live")
-            if !group.videos.isEmpty { return group }
-        } catch {
-            tubeLog.notice("fetchLive browse failed, falling back to search: \(error, privacy: .public)")
-        }
-        return try await search(query: "live stream")
+        try await fetchCategory("Live", channelId: CategoryChannel.live, fallbackQuery: "live stream")
     }
 
     public func fetchSports() async throws -> VideoGroup {
-        do {
-            // FEsportsau is the known TVHTML5 browse ID for the sports category.
-            var body = makeBody(client: tvClientContext)
-            body["browseId"] = "FEsportsau"
-            let data = try await postTVCategory(endpoint: "browse", body: body)
-            let group = try parseVideoGroup(from: data, title: "Sports")
-            if !group.videos.isEmpty { return group }
-        } catch {
-            tubeLog.notice("fetchSports browse failed, falling back to search: \(error, privacy: .public)")
-        }
-        return try await search(query: "sports")
+        try await fetchCategory("Sports", channelId: CategoryChannel.sports, fallbackQuery: "sports")
     }
 }
