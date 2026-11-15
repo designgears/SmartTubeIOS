@@ -424,26 +424,20 @@ struct BotGuardClientTests {
 /// Skipped by default — set BG_LIVE_TEST=1 env var to enable.
 @Suite("BotGuardClient Live", .serialized)
 struct BotGuardClientLiveTests {
-    /// Verifies the full BotGuard pipeline runs end-to-end and produces a non-empty PO token.
-    ///
-    /// Architecture note: the WAA GenerateIT server returns json[0]=null for JSC environments
-    /// (the BotGuard VM clones arguments so Proxy traps on webPoSignalOutput never fire, and
-    /// getMinter is never set). The websafe fallback token (json[3]) is the expected result
-    /// for this environment and IS a valid PO token accepted by YouTube.
-    @Test("Live pipeline: websafe fallback path produces a valid PO token")
-    func livePipelineWebsafeFallback() async throws {
+    /// In a bare JavaScriptCore context BotGuard withholds getMinter and GenerateIT returns
+    /// integrityToken=null. The websafe fallback it returns instead is rejected by the CDN,
+    /// so the client must fail rather than hand it out (verified 2026-11-15 against jsdom,
+    /// which does mint real tokens).
+    @Test("Live pipeline: bare JSC refuses the websafe fallback")
+    func livePipelineRefusesWebsafeFallback() async throws {
         guard ProcessInfo.processInfo.environment["BG_LIVE_TEST"] == "1" else {
             return  // skip unless explicitly opted in
         }
         let client = BotGuardClient()
-        let token = try await client.token(for: "LSMQ3U1Thzw")
-        // Websafe fallback path: getMinter is not set (VM clones args, Proxy never fires),
-        // integrityToken is nil (WAA returns json[0]=null for JSC), websafe fallback is used.
-        #expect(token.count > 0, "Token should be non-empty")
-        #expect(
-            client.lastRunHasMinter == false, "Expected websafe fallback path — getMinter is not set in JSC environment"
-        )
-        #expect(client.lastRunIntegrityTokenLen == 0, "Expected json[0]=null from WAA server (JSC environment)")
+        await #expect(throws: BotGuardError.self) {
+            _ = try await client.token(for: "LSMQ3U1Thzw")
+        }
+        #expect(client.lastRunHasMinter == false, "Bare JSC is not expected to receive getMinter")
     }
 }
 

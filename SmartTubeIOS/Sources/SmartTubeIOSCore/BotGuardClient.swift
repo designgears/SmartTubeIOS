@@ -89,6 +89,7 @@ public final class BotGuardClient: PoTokenProvider, @unchecked Sendable {
             return cached
         }
 
+
         bgLog.notice("[BotGuard] token requested for \(videoId, privacy: .public)")
 
         // Phase 1 – fetch challenge (async Swift network call, off jsQueue).
@@ -638,13 +639,16 @@ public final class BotGuardClient: PoTokenProvider, @unchecked Sendable {
         lastRunHasMinter = hasMinter
 
         if !hasMinter {
-            // webPoSignalOutput[0] not available — use websafeFallbackToken directly.
-            // This token from GenerateIT (json[3]) is a ready-to-use URL-safe base64 PO token.
-            guard let fallback = websafeFallback, !fallback.isEmpty else {
-                throw BotGuardError.mintFailed("getMinter not set and no websafeFallbackToken available")
-            }
-            bgLog.notice("[BotGuard] ✅ using websafe fallback token (len=\(fallback.count)) for \(videoId)")
-            return fallback
+            // No getMinter means BotGuard judged the environment non-browser: GenerateIT then
+            // returns integrityToken=null plus a websafeFallbackToken. That fallback is NOT
+            // accepted by googlevideo for rqh=1 streams, and attaching it only sends playback
+            // down slow composition attempts that time out. Fail instead so callers proceed
+            // without a token. (Verified 2026-11-15: bare JS engine → no getMinter; a full
+            // DOM such as jsdom → real integrityToken + getMinter. See docs/research/BotGuard.md.)
+            bgLog.notice(
+                "[BotGuard] no getMinter (non-browser environment) — refusing websafe fallback (len=\(websafeFallback?.count ?? 0))"
+            )
+            throw BotGuardError.mintFailed("getMinter not set — BotGuard rejected this JS environment")
         }
 
         // Full minting flow: getMinter(integrityTokenBytes) → mintCallback(videoIdBytes) → PO token

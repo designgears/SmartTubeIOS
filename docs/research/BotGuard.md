@@ -8,6 +8,28 @@
 
 ---
 
+## 0. Findings 2026-11-15 (supersede the JSC notes below)
+
+Experiment harness: BgUtils flow (WAA Create → `vm.a` → snapshot → GenerateIT → `getMinter` → mint)
+run against the live WAA API in three environments:
+
+| Environment | `getMinter` | `integrityToken` | Real token |
+|---|---|---|---|
+| Bare JS engine (what `BotGuardClient`'s JSContext has) | never | null (websafe fallback only) | no |
+| linkedom (+ events / rIC / rAF shims) | ~2 in 10 | sometimes | unreliable |
+| jsdom (full DOM) | always (7/7) | 84–92 B | **yes** |
+
+- The "VM clones arguments so the Proxy never fires" theory is wrong: BotGuard simply refuses a
+  non-browser environment. A full DOM is what makes it mint.
+- The websafe fallback is not a usable token; `BotGuardClient` now throws instead of returning it.
+- GVS (`&pot=` on googlevideo) tokens must be bound to **visitorData** (signed out) /
+  **dataSyncId** (signed in), not the videoId. `prefetchPoToken` now binds to visitorData.
+- MWEB adaptive formats are `signatureCipher`; once sig + n are solved on-device
+  (`YouTubeJSSolver`) their `rqh=1` URLs served a 512 KB range 2 MB into the file **without any
+  PO token**. The composition gates now let deciphered MWEB through (with the 128 KB probe).
+- On-device minting for tvOS would need a bundled full DOM (jsdom-class) in JavaScriptCore.
+  Not built; revisit only if MWEB starts enforcing PO tokens.
+
 ## 1. What BotGuard Is
 
 YouTube's CDN uses a challenge-response system called **BotGuard** to gate adaptive stream access. Any URL that contains `rqh=1` in its path will return HTTP 403 on media segments unless the `/player` request body and every stream URL carry a **Proof-of-Origin (PO) token** (`&pot=<base64>`).

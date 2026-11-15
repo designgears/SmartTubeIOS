@@ -89,7 +89,11 @@ public actor InnerTubeAPI {
     /// after the first successful pipeline run.
     public func prefetchPoToken(for videoId: String) async {
         guard let provider = poTokenProvider, poToken == nil || poTokenVideoId != videoId else { return }
-        if let pot = try? await provider.token(for: videoId) {
+        // This token is appended as &pot= to googlevideo URLs (a GVS token), which YouTube
+        // binds to the session identity — visitorData when signed out — not the videoId.
+        // (dataSyncId would be the signed-in binding; not plumbed yet.)
+        let contentBinding = visitorData ?? videoId
+        if let pot = try? await provider.token(for: contentBinding) {
             poToken = pot
             poTokenVideoId = videoId
             tubeLog.notice("[InnerTube] prefetchPoToken ✅ (len=\(pot.count)) for \(videoId, privacy: .public)")

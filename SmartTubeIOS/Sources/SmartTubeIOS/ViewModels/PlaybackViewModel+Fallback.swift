@@ -949,7 +949,13 @@ extension PlaybackViewModel {
                 // this exemption via isAndroidVR, but it was unreachable from here because
                 // this guard returned early before calling it. Allow VR through directly.
                 let isAndroidVRLabel = label.contains("AndroidVR") || label.contains("ANDROID_VR")
-                if hasPot || isAndroidVRLabel {
+                // MWEB: once signatureCipher + n are solved on-device (YouTubeJSSolver), its rqh=1
+                // adaptive URLs serve deep byte ranges without a PO token (verified 2026-11-15).
+                // attemptComposition still runs a 128 KB probe, so enforcement fails fast.
+                let isMWEBURL =
+                    URLComponents(url: videoURL, resolvingAgainstBaseURL: false)?
+                    .queryItems?.first(where: { $0.name == "c" })?.value == "MWEB"
+                if hasPot || isAndroidVRLabel || isMWEBURL {
                     #if os(tvOS)
                     // fix2: Pre-fetch TVEmbedded concurrently while AndroidVR rqh=1 composition
                     // times out (2s on tvOS). By the time the timeout fires and exhaustiveRetry
@@ -967,7 +973,7 @@ extension PlaybackViewModel {
                     }
                     #endif
                     playerLog.notice(
-                        "[\(label)] rqh=1 but \(hasPot ? "pot= token available" : "ANDROID_VR exempt") — attempting adaptive composition"
+                        "[\(label)] rqh=1 but \(hasPot ? "pot= token available" : isMWEBURL ? "MWEB deciphered" : "ANDROID_VR exempt") — attempting adaptive composition"
                     )
                     if await attemptComposition(
                         videoURL: videoURL, audioURL: audioURL,
@@ -1399,12 +1405,14 @@ extension PlaybackViewModel {
         // with a full getMinter-minted token — those ARE accepted by the CDN.
         let isTVAuthBearer = label.contains("TVAuth") && hasAuthToken && currentAuthToken != nil
         let isAndroidVR = clientParam == "ANDROID_VR"
+        // Deciphered MWEB rqh=1 streams play without a PO token (see exhaustive guard above).
+        let isMWEB = clientParam == "MWEB"
         #if canImport(WebKit)
         let isBotGuardMinted = label == "BotGuardWV" && hasMintedPoToken
         #else
         let isBotGuardMinted = false
         #endif
-        if videoRqh && !isTVAuthBearer && !isAndroidVR && !isBotGuardMinted {
+        if videoRqh && !isTVAuthBearer && !isAndroidVR && !isMWEB && !isBotGuardMinted {
             playerLog.notice("[\(label)/adaptive] skipping rqh=1 (client=\(clientParam)) — not exempt")
             return false
         }
@@ -1412,6 +1420,8 @@ extension PlaybackViewModel {
             playerLog.notice(
                 "[\(label)/adaptive] attempting rqh=1 with WKWebView-minted BotGuard token (client=\(clientParam)) — CDN should accept"
             )
+        } else if videoRqh && isMWEB {
+            playerLog.notice("[\(label)/adaptive] attempting rqh=1 MWEB (deciphered, no pot) — probing CDN")
         } else if videoRqh {
             playerLog.notice("[\(label)/adaptive] attempting rqh=1 TVAuth with Bearer — CDN auth experiment")
         }
@@ -1480,7 +1490,7 @@ extension PlaybackViewModel {
         // Timing: 128 KB at 148 Mbps ≈ 7 ms; at 10 Mbps ≈ 100 ms; stall → 1.5s.
         // TVAuth with Bearer is intentionally excluded — injecting an OAuth token into
         // a bare URLSession changes CDN session state, separate from AVURLAsset context.
-        if videoRqh && isAndroidVR {
+        if videoRqh && (isAndroidVR || isMWEB) {
             var probeReq = URLRequest(url: videoURL)
             probeReq.setValue(ua, forHTTPHeaderField: "User-Agent")
             probeReq.setValue("bytes=0-131071", forHTTPHeaderField: "Range")
