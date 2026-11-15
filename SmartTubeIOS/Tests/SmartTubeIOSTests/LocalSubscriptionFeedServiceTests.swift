@@ -5,7 +5,8 @@ import Testing
 
 // MARK: - LocalSubscriptionFeedServiceTests
 
-@Suite("Local Subscription Feed Service")
+// Serialized: tests share the static `RouterURLProtocol.routes` and reset it on exit.
+@Suite("Local Subscription Feed Service", .serialized)
 @MainActor
 struct LocalSubscriptionFeedServiceTests {
 

@@ -29,18 +29,36 @@ private func postHideChannel(id: String) {
     )
 }
 
-/// Posts `.hideVideoFromFeed` and waits for the ViewModel's notification
-/// observer task to process it before returning.
-private func postHideVideoAndWait(id: String) async {
-    postHideVideo(id: id)
-    try? await Task.sleep(for: .milliseconds(100))
+/// Posts `.hideVideoFromFeed` until `done()` holds (or a 3 s deadline). The view models
+/// observe through an async notification sequence started in a Task, so a single post can
+/// land before the sequence subscribes and be lost; hiding is idempotent, so re-posting is
+/// safe. Without `done`, posts once and gives the observer a moment (for "no change" tests).
+@MainActor
+private func postHideVideoAndWait(id: String, until done: (() -> Bool)? = nil) async {
+    await postAndWait({ postHideVideo(id: id) }, until: done)
 }
 
-/// Posts `.hideChannelFromFeed` and waits for the ViewModel's notification
-/// observer task to process it before returning.
-private func postHideChannelAndWait(id: String) async {
-    postHideChannel(id: id)
-    try? await Task.sleep(for: .milliseconds(100))
+/// Posts `.hideChannelFromFeed` until `done()` holds — see `postHideVideoAndWait`.
+@MainActor
+private func postHideChannelAndWait(id: String, until done: (() -> Bool)? = nil) async {
+    await postAndWait({ postHideChannel(id: id) }, until: done)
+}
+
+@MainActor
+private func postAndWait(_ post: () -> Void, until done: (() -> Bool)?) async {
+    guard let done else {
+        post()
+        for _ in 0..<50 { await Task.yield() }
+        return
+    }
+    let deadline = Date().addingTimeInterval(3)
+    repeat {
+        post()
+        for _ in 0..<20 {
+            await Task.yield()
+            if done() { return }
+        }
+    } while Date() < deadline
 }
 
 // MARK: - SearchViewModel
@@ -79,7 +97,7 @@ struct SearchViewModelFeedHideTests {
         ])
         #expect(vm.results.count == 2)
 
-        await postHideVideoAndWait(id: id2)
+        await postHideVideoAndWait(id: id2, until: { vm.results.count == 1 })
 
         #expect(vm.results.count == 1)
         #expect(vm.results.first?.id == id1)
@@ -106,7 +124,7 @@ struct SearchViewModelFeedHideTests {
         ])
         #expect(vm.results.count == 3)
 
-        await postHideChannelAndWait(id: channel1)
+        await postHideChannelAndWait(id: channel1, until: { vm.results.count == 1 })
 
         #expect(vm.results.count == 1)
         #expect(vm.results.first?.channelId == channel2)
@@ -154,7 +172,7 @@ struct ChannelViewModelFeedHideTests {
         ])
         #expect(vm.videos.count == 2)
 
-        await postHideVideoAndWait(id: id2)
+        await postHideVideoAndWait(id: id2, until: { vm.videos.count == 1 })
 
         #expect(vm.videos.count == 1)
         #expect(vm.videos.first?.id == id1)
@@ -170,7 +188,7 @@ struct ChannelViewModelFeedHideTests {
         ])
         #expect(vm.videos.count == 2)
 
-        await postHideChannelAndWait(id: ch1)
+        await postHideChannelAndWait(id: ch1, until: { vm.videos.count == 1 })
 
         #expect(vm.videos.count == 1)
         #expect(vm.videos.first?.channelId == ch2)
@@ -209,7 +227,7 @@ struct PlaylistViewModelFeedHideTests {
         ])
         #expect(vm.videos.count == 2)
 
-        await postHideVideoAndWait(id: id2)
+        await postHideVideoAndWait(id: id2, until: { vm.videos.count == 1 })
 
         #expect(vm.videos.count == 1)
         #expect(vm.videos.first?.id == id1)
@@ -226,7 +244,7 @@ struct PlaylistViewModelFeedHideTests {
         ])
         #expect(vm.videos.count == 3)
 
-        await postHideChannelAndWait(id: ch1)
+        await postHideChannelAndWait(id: ch1, until: { vm.videos.count == 1 })
 
         #expect(vm.videos.count == 1)
         #expect(vm.videos.first?.channelId == ch2)

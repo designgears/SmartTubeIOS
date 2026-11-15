@@ -105,7 +105,11 @@ public final class BrowseViewModel {
             })
         hideObserverTasks.append(
             Task { [weak self] in
-                for await note in NotificationCenter.default.notifications(named: .watchLaterDidChange) {
+                // Only this view model's store: the notification is process-wide.
+                let membership = self?.watchLaterMembership
+                for await note in NotificationCenter.default.notifications(
+                    named: .watchLaterDidChange, object: membership)
+                {
                     guard let self, let videoId = note.userInfo?["videoId"] as? String else { continue }
                     self.applyWatchLaterChange(videoId: videoId, added: note.userInfo?["added"] as? Bool ?? false)
                 }
@@ -253,6 +257,12 @@ public final class BrowseViewModel {
         }
         fetchTask?.cancel()
         fetchTask = Task { await fetchSection(target) }
+    }
+
+    /// Test hook: waits for the in-flight fetch (first load or next page) to finish, so
+    /// tests can assert on `videoGroups` without sleeping.
+    func awaitPendingFetch() async {
+        await fetchTask?.value
     }
 
     public func loadMoreIfNeeded(lastVideo: Video) {

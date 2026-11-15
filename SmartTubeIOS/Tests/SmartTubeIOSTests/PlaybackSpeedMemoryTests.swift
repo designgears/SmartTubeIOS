@@ -6,7 +6,8 @@ import Testing
 @Suite("Playback speed memory")
 struct PlaybackSpeedMemoryTests {
     @Test func musicVideoTypeMarksMusic() {
-        #expect(PlayerInfo.looksLikeMusic(musicVideoType: "MUSIC_VIDEO_TYPE_OMV", category: nil, channelTitle: "Anyone"))
+        #expect(
+            PlayerInfo.looksLikeMusic(musicVideoType: "MUSIC_VIDEO_TYPE_OMV", category: nil, channelTitle: "Anyone"))
     }
 
     @Test func musicCategoryMarksMusic() {
@@ -19,15 +20,18 @@ struct PlaybackSpeedMemoryTests {
     }
 
     @Test func musicTitleTagsMarkMusic() {
-        #expect(PlayerInfo.looksLikeMusic(
-            musicVideoType: nil, category: nil, channelTitle: "Solitude Songs",
-            title: "The Weeknd, Playboi Carti & Madonna - Popular (Lyrics)"))
-        #expect(PlayerInfo.looksLikeMusic(
-            musicVideoType: nil, category: nil, channelTitle: "Some Artist",
-            title: "Song Name [Official Music Video]"))
-        #expect(!PlayerInfo.looksLikeMusic(
-            musicVideoType: nil, category: nil, channelTitle: "Gamers Nexus",
-            title: "Audio interface review: the best budget picks"))
+        #expect(
+            PlayerInfo.looksLikeMusic(
+                musicVideoType: nil, category: nil, channelTitle: "Solitude Songs",
+                title: "The Weeknd, Playboi Carti & Madonna - Popular (Lyrics)"))
+        #expect(
+            PlayerInfo.looksLikeMusic(
+                musicVideoType: nil, category: nil, channelTitle: "Some Artist",
+                title: "Song Name [Official Music Video]"))
+        #expect(
+            !PlayerInfo.looksLikeMusic(
+                musicVideoType: nil, category: nil, channelTitle: "Gamers Nexus",
+                title: "Audio interface review: the best budget picks"))
     }
 
     @Test func regularVideosAreNotMusic() {

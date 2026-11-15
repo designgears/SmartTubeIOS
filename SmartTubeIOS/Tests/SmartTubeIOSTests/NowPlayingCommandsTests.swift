@@ -14,6 +14,7 @@ import MediaPlayer
 /// Regression test for Task #233: lock screen Now Playing widget was missing
 /// next/previous buttons because nextTrackCommand / previousTrackCommand were never
 /// registered in setupRemoteCommandCenter().
+@Suite(.serialized)  // every test drives the process-wide MPRemoteCommandCenter.shared()
 @MainActor
 struct NowPlayingCommandsTests {
 
@@ -24,6 +25,9 @@ struct NowPlayingCommandsTests {
     @Test func nextTrackCommandRegisteredAfterSetup() {
         let vm = PlaybackViewModel()
         vm.setupRemoteCommandCenter()
+        // The command center is process-wide: other suites' players may have enabled it.
+        // This player has no queue, so publishing its state must leave the button off.
+        vm.updateNowPlayingInfo()
         let cmd = MPRemoteCommandCenter.shared().nextTrackCommand
         // The command should exist (non-nil isEnabled is always accessible).
         // The key assertion: we successfully called addTarget without crashing —
@@ -35,6 +39,9 @@ struct NowPlayingCommandsTests {
     @Test func previousTrackCommandRegisteredAfterSetup() {
         let vm = PlaybackViewModel()
         vm.setupRemoteCommandCenter()
+        // The command center is process-wide: other suites' players may have enabled it.
+        // This player has no queue, so publishing its state must leave the button off.
+        vm.updateNowPlayingInfo()
         let cmd = MPRemoteCommandCenter.shared().previousTrackCommand
         #expect(cmd.isEnabled == false)
     }

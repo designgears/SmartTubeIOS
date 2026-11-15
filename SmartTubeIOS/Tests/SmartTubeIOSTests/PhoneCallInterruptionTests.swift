@@ -52,7 +52,9 @@ struct PhoneCallInterruptionFlagTests {
 }
 
 #if canImport(UIKit)
-@Suite("Phone call interruption — AVAudioSession notification handling (#244)")
+// Serialized: the interruption notification is process-global, so a parallel test's
+// `.ended(shouldResume)` would resume another test's player mid-assertion.
+@Suite("Phone call interruption — AVAudioSession notification handling (#244)", .serialized)
 @MainActor
 struct PhoneCallInterruptionNotificationTests {
 

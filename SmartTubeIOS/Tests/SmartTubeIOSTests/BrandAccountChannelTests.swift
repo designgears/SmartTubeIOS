@@ -177,7 +177,10 @@ struct BrandAccountRequestHeaderTests {
 struct BrandAccountPersistenceTests {
 
     // deve persistir o pageId no Keychain entre instâncias do TokenManager
-    @Test("should persist the pageId in the Keychain across TokenManager instances")
+    @Test(
+        "should persist the pageId in the Keychain across TokenManager instances",
+        .enabled(if: KeychainProbe.isAvailable, "Keychain is not writable in this test host")
+    )
     func persistsPageId() async {
         let service = "test-tm-pageid-\(UUID().uuidString)"
         let tm = TokenManager(keychainService: service)
@@ -216,73 +219,75 @@ struct BrandAccountPersistenceTests {
 }
 
 // AuthService writes to ActiveChannel.shared, so these run serially and reset it afterwards.
-@MainActor
-@Suite("Brand Account — AuthService channel switch and sign-out", .serialized)
-struct BrandAccountAuthServiceTests {
+extension ActiveChannelSuites {
+    @MainActor
+    @Suite("Brand Account — AuthService channel switch and sign-out", .serialized)
+    struct BrandAccountAuthServiceTests {
 
-    private final class NotificationCounter: @unchecked Sendable {
-        var count = 0
-    }
+        private final class NotificationCounter: @unchecked Sendable {
+            var count = 0
+        }
 
-    private let primary = YouTubeChannel(name: "Primary User", avatarURL: nil, pageId: nil)
-    private let brand = YouTubeChannel(name: "Brand Channel", avatarURL: nil, pageId: "100000000000000000001")
+        private let primary = YouTubeChannel(name: "Primary User", avatarURL: nil, pageId: nil)
+        private let brand = YouTubeChannel(name: "Brand Channel", avatarURL: nil, pageId: "100000000000000000001")
 
-    private func countChannelChanges(during action: () -> Void) -> Int {
-        let counter = NotificationCounter()
-        let token = NotificationCenter.default.addObserver(
-            forName: .activeChannelDidChange, object: nil, queue: nil
-        ) { _ in counter.count += 1 }
-        action()
-        NotificationCenter.default.removeObserver(token)
-        return counter.count
-    }
+        private func countChannelChanges(during action: () -> Void) -> Int {
+            let counter = NotificationCounter()
+            let token = NotificationCenter.default.addObserver(
+                forName: .activeChannelDidChange, object: nil, queue: nil
+            ) { _ in counter.count += 1 }
+            action()
+            NotificationCenter.default.removeObserver(token)
+            return counter.count
+        }
 
-    // deve disparar activeChannelDidChange ao trocar para um Brand Account diferente do ativo
-    @Test("should post activeChannelDidChange when switching to a different Brand Account")
-    func postsChangeOnSwitch() {
-        let auth = AuthService()
-        auth.applyChannels([primary, brand])
-        defer { auth.resetChannels() }
+        // deve disparar activeChannelDidChange ao trocar para um Brand Account diferente do ativo
+        @Test("should post activeChannelDidChange when switching to a different Brand Account")
+        func postsChangeOnSwitch() {
+            let auth = AuthService()
+            auth.applyChannels([primary, brand])
+            defer { auth.resetChannels() }
 
-        let changes = countChannelChanges { auth.selectChannel(brand) }
+            let changes = countChannelChanges { auth.selectChannel(brand) }
 
-        #expect(changes == 1)
-        #expect(auth.activePageId == brand.pageId)
-    }
+            #expect(changes == 1)
+            #expect(auth.activePageId == brand.pageId)
+        }
 
-    // não deve disparar activeChannelDidChange ao selecionar o canal que já está ativo
-    @Test("should not post activeChannelDidChange when selecting the already active channel")
-    func skipsChangeForActiveChannel() {
-        let auth = AuthService()
-        auth.applyChannels([primary, brand])
-        auth.selectChannel(brand)
-        defer { auth.resetChannels() }
+        // não deve disparar activeChannelDidChange ao selecionar o canal que já está ativo
+        @Test("should not post activeChannelDidChange when selecting the already active channel")
+        func skipsChangeForActiveChannel() {
+            let auth = AuthService()
+            auth.applyChannels([primary, brand])
+            auth.selectChannel(brand)
+            defer { auth.resetChannels() }
 
-        let changes = countChannelChanges { auth.selectChannel(brand) }
+            let changes = countChannelChanges { auth.selectChannel(brand) }
 
-        #expect(changes == 0)
-    }
+            #expect(changes == 0)
+        }
 
-    // deve limpar o canal selecionado no logout e enviar a próxima requisição sem X-Goog-Pageid
-    @Test("should clear the selected channel on sign-out and send the next request without X-Goog-Pageid")
-    func signOutClearsSelectedChannel() async {
-        let auth = AuthService()
-        auth.applyChannels([primary, brand])
-        auth.selectChannel(brand)
+        // deve limpar o canal selecionado no logout e enviar a próxima requisição sem X-Goog-Pageid
+        @Test("should clear the selected channel on sign-out and send the next request without X-Goog-Pageid")
+        func signOutClearsSelectedChannel() async {
+            let auth = AuthService()
+            auth.applyChannels([primary, brand])
+            auth.selectChannel(brand)
 
-        auth.signOut()
+            auth.signOut()
 
-        #expect(auth.activePageId == nil)
-        #expect(auth.channels.isEmpty)
-        #expect(ActiveChannel.shared.pageId == nil)
+            #expect(auth.activePageId == nil)
+            #expect(auth.channels.isEmpty)
+            #expect(ActiveChannel.shared.pageId == nil)
 
-        ChannelStubURLProtocol.capturedHeaders = []
-        let config = URLSessionConfiguration.ephemeral
-        config.protocolClasses = [ChannelStubURLProtocol.self]
-        let session = URLSession(configuration: config)
-        let api = InnerTubeAPI(authToken: "fake-token", session: session, activeChannel: .shared)
-        _ = try? await api.fetchSubscriptions()
+            ChannelStubURLProtocol.capturedHeaders = []
+            let config = URLSessionConfiguration.ephemeral
+            config.protocolClasses = [ChannelStubURLProtocol.self]
+            let session = URLSession(configuration: config)
+            let api = InnerTubeAPI(authToken: "fake-token", session: session, activeChannel: .shared)
+            _ = try? await api.fetchSubscriptions()
 
-        #expect(ChannelStubURLProtocol.capturedHeaders.first?["X-Goog-Pageid"] == nil)
+            #expect(ChannelStubURLProtocol.capturedHeaders.first?["X-Goog-Pageid"] == nil)
+        }
     }
 }

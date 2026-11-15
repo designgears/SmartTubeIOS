@@ -16,7 +16,10 @@ struct TokenManagerTests {
 
     // MARK: - 1. Keychain roundtrip
 
-    @Test("setToken persists all fields to Keychain across instances")
+    @Test(
+        "setToken persists all fields to Keychain across instances",
+        .enabled(if: KeychainProbe.isAvailable, "Keychain is not writable in this test host")
+    )
     func setTokenPersistsToKeychain() async throws {
         let service = "test-tm-\(UUID().uuidString)"
         let tm = TokenManager(keychainService: service)

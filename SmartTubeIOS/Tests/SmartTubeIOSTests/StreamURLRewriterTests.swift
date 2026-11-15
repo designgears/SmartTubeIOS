@@ -9,20 +9,20 @@ struct StreamURLRewriterTests {
 
     private var cipheredFormat: [String: Any] {
         let inner = "https://rr1.googlevideo.com/videoplayback?expire=1&n=CIPHERN&sparams=expire%2Cn"
-        let encodedInner = inner.addingPercentEncoding(withAllowedCharacters: .alphanumerics)!
+        let encodedInner = inner.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? inner
         return ["itag": 137, "signatureCipher": "s=RAW%3DSIG&sp=sig&url=\(encodedInner)"]
     }
 
     @Test func collectsSigAndNChallenges() {
         let formats: [[String: Any]] = [["itag": 18, "url": plainURL], cipheredFormat]
-        let c = StreamURLRewriter.challenges(in: formats, includeN: true)
-        #expect(c.sig == ["RAW=SIG"])
-        #expect(c.n == ["SCRAMBLED", "CIPHERN"])
+        let challenges = StreamURLRewriter.challenges(in: formats, includeN: true)
+        #expect(challenges.sig == ["RAW=SIG"])
+        #expect(challenges.n == ["SCRAMBLED", "CIPHERN"])
     }
 
     @Test func skipsNForJSLessClients() {
-        let c = StreamURLRewriter.challenges(in: [["itag": 18, "url": plainURL]], includeN: false)
-        #expect(c.isEmpty)
+        let challenges = StreamURLRewriter.challenges(in: [["itag": 18, "url": plainURL]], includeN: false)
+        #expect(challenges.isEmpty)
     }
 
     @Test func rewritesNWithoutTouchingOtherParams() throws {
@@ -55,7 +55,7 @@ struct StreamURLRewriterTests {
 
     // MARK: HLS
 
-    private let master = """
+    private let multivariantPlaylist = """
         #EXTM3U
         #EXT-X-STREAM-INF:BANDWIDTH=1,RESOLUTION=1280x720
         https://manifest.googlevideo.com/api/manifest/hls_playlist/expire/1/n/AAA/itag/22/file/index.m3u8
@@ -64,12 +64,12 @@ struct StreamURLRewriterTests {
         """
 
     @Test func findsDistinctHLSNValues() {
-        #expect(StreamURLRewriter.hlsNChallenges(in: master) == ["AAA"])
+        #expect(StreamURLRewriter.hlsNChallenges(in: multivariantPlaylist) == ["AAA"])
         #expect(StreamURLRewriter.hlsNChallenges(in: "#EXTM3U\nhttps://x/videoplayback/id/1/file/seg.ts").isEmpty)
     }
 
     @Test func rewritesEveryHLSNOccurrence() {
-        let out = StreamURLRewriter.replacingHLSN(in: master, solutions: ["AAA": "zz"])
+        let out = StreamURLRewriter.replacingHLSN(in: multivariantPlaylist, solutions: ["AAA": "zz"])
         #expect(!out.contains("/n/AAA/"))
         #expect(out.components(separatedBy: "/n/zz/").count == 3)
     }

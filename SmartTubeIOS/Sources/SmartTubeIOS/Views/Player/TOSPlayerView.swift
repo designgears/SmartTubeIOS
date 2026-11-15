@@ -976,9 +976,14 @@ public struct TOSPlayerView: View {
 #if os(macOS)
 private struct YouTubeWebPlayerView: NSViewRepresentable {
     let webView: WKWebView
+    /// Same contract as the UIKit version: called once the web view is in a window.
+    let onWindowReady: (() -> Void)?
 
     func makeNSView(context: Context) -> WKWebView {
         webView.autoresizingMask = [.width, .height]
+        if let onWindowReady {
+            Task { @MainActor in onWindowReady() }
+        }
         return webView
     }
 
