@@ -224,7 +224,7 @@ struct TVNativePlayer: UIViewControllerRepresentable {
         var actions: TVPlayerActions?
         var transportBar: TVPlayerPresentationState?
         private weak var pvc: AVPlayerViewController?
-        private weak var vm: PlaybackViewModel?
+        weak var vm: PlaybackViewModel?
         private var fallbackVideo: Video?
         private var lastState: TVPlayerMenuState?
         private var itemObservation: NSKeyValueObservation?
@@ -238,10 +238,10 @@ struct TVNativePlayer: UIViewControllerRepresentable {
         private var pausedStartFallback: Task<Void, Never>?
         private var artworkTask: Task<Void, Never>?
         private var panelsShowChapters: Bool?
-        private var transportBarSafetyHide: Task<Void, Never>?
+        var transportBarSafetyHide: Task<Void, Never>?
         /// tvOS hides an untouched transport bar after 5–8 s; used only when it never
         /// reports hiding (see `remoteInteraction`).
-        private static let transportBarSafetyTimeout: Duration = .seconds(8)
+        static let transportBarSafetyTimeout: Duration = .seconds(8)
 
         func attach(
             _ pvc: AVPlayerViewController, vm: PlaybackViewModel, fallbackVideo: Video, actions: TVPlayerActions
@@ -304,35 +304,9 @@ struct TVNativePlayer: UIViewControllerRepresentable {
             withAnimation(.easeOut(duration: 0.3)) { transportBar?.isVideoOnScreen = videoShown }
         }
 
-        // MARK: Transport-bar visibility
-        //
-        // `willTransitionToVisibilityOfTransportBar` always reports the bar hiding, but
-        // not the bar appearing for left/right skips and scrubbing. So those presses also
-        // count as "bar showing"; the delegate's hide event ends it, with a safety timeout
-        // in case the bar never actually appeared. (Select/Play-Pause are left to the
-        // delegate: resuming from pause doesn't always bring the bar up.)
+        // MARK: Transport-bar visibility (see TVTransportBarTracking.swift)
 
-        private func installInteractionRecognizers(on view: UIView) {
-            let presses = UITapGestureRecognizer(target: self, action: #selector(remoteInteraction))
-            let pressTypes: [UIPress.PressType] = [.leftArrow, .rightArrow]
-            presses.allowedPressTypes = pressTypes.map { NSNumber(value: $0.rawValue) }
-            presses.allowedTouchTypes = []
-            presses.cancelsTouchesInView = false
-            presses.delegate = self
-            view.addGestureRecognizer(presses)
-        }
-
-        @objc private func remoteInteraction() {
-            setTransportBarVisible(true)
-            transportBarSafetyHide?.cancel()
-            transportBarSafetyHide = Task { [weak self] in
-                try? await Task.sleep(for: Self.transportBarSafetyTimeout)
-                guard !Task.isCancelled else { return }
-                self?.setTransportBarVisible(false)
-            }
-        }
-
-        private func setTransportBarVisible(_ visible: Bool) {
+        func setTransportBarVisible(_ visible: Bool) {
             guard transportBar?.isVisible != visible else { return }
             withAnimation(.easeInOut(duration: 0.25)) { transportBar?.isVisible = visible }
         }
