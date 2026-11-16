@@ -30,11 +30,10 @@ struct TVPlayerScreen: View {
                 TVNativePlayer(
                     vm: vm, state: menuState(vm), actions: actions(vm), fallbackVideo: video,
                     fillsScreen: store.settings.videoGravityMode == .fill,
+                    segments: vm.sponsorSegments, duration: vm.duration,
                     transportBar: transportBar
                 )
                 .ignoresSafeArea()
-                TVSponsorSegmentsTrack(
-                    segments: vm.sponsorSegments, duration: vm.duration, isVisible: transportBar.isVisible)
                 TVPlayerOverlays(vm: vm, video: video, isVideoOnScreen: transportBar.isVideoOnScreen) {
                     navigator.nowPlaying = nil
                 }
@@ -188,7 +187,10 @@ struct TVNativePlayer: UIViewControllerRepresentable {
     let fallbackVideo: Video
     /// Settings › Video Fit: crop to fill instead of letterboxing.
     var fillsScreen = false
-    /// Mirrors the native transport bar's visibility (for overlays drawn on top of it).
+    /// SponsorBlock segments for the strip on the scrubber.
+    var segments: [SponsorSegment] = []
+    var duration: TimeInterval = 0
+    /// What the player is showing, for the overlays drawn on top of it.
     var transportBar: TVPlayerPresentationState?
 
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -205,6 +207,7 @@ struct TVNativePlayer: UIViewControllerRepresentable {
         pvc.delegate = context.coordinator
         context.coordinator.attach(pvc, vm: vm, fallbackVideo: fallbackVideo, actions: actions)
         context.coordinator.apply(state: state)
+        context.coordinator.updateSegmentStrip(segments: segments, duration: duration)
         return pvc
     }
 
@@ -213,6 +216,7 @@ struct TVNativePlayer: UIViewControllerRepresentable {
         context.coordinator.apply(state: state)
         let gravity: AVLayerVideoGravity = fillsScreen ? .resizeAspectFill : .resizeAspect
         if pvc.videoGravity != gravity { pvc.videoGravity = gravity }
+        context.coordinator.updateSegmentStrip(segments: segments, duration: duration)
     }
 
     static func dismantleUIViewController(_ pvc: AVPlayerViewController, coordinator: Coordinator) {
@@ -238,10 +242,9 @@ struct TVNativePlayer: UIViewControllerRepresentable {
         private var pausedStartFallback: Task<Void, Never>?
         private var artworkTask: Task<Void, Never>?
         private var panelsShowChapters: Bool?
-        var transportBarSafetyHide: Task<Void, Never>?
-        /// tvOS hides an untouched transport bar after 5–8 s; used only when it never
-        /// reports hiding (see `remoteInteraction`).
-        static let transportBarSafetyTimeout: Duration = .seconds(8)
+        /// SponsorBlock segments, inside the native transport bar (TVTransportBarTracking.swift).
+        let segmentStrip = TVSponsorSegmentStrip()
+        var playerView: UIView? { pvc?.view }
 
         func attach(
             _ pvc: AVPlayerViewController, vm: PlaybackViewModel, fallbackVideo: Video, actions: TVPlayerActions
@@ -258,7 +261,7 @@ struct TVNativePlayer: UIViewControllerRepresentable {
                     if hasItem { self?.videoWillChange() }
                 }
             }
-            installInteractionRecognizers(on: pvc.view)
+            installSegmentStrip(on: pvc.view)
             readyObservation = pvc.observe(\.isReadyForDisplay, options: [.initial, .new]) { [weak self] _, _ in
                 Task { @MainActor in self?.refreshVideoOnScreen() }
             }
@@ -304,12 +307,7 @@ struct TVNativePlayer: UIViewControllerRepresentable {
             withAnimation(.easeOut(duration: 0.3)) { transportBar?.isVideoOnScreen = videoShown }
         }
 
-        // MARK: Transport-bar visibility (see TVTransportBarTracking.swift)
-
-        func setTransportBarVisible(_ visible: Bool) {
-            guard transportBar?.isVisible != visible else { return }
-            withAnimation(.easeInOut(duration: 0.25)) { transportBar?.isVisible = visible }
-        }
+        // MARK: Transport bar
 
         /// Observe only — never compete with AVPlayerViewController's own recognizers.
         nonisolated func gestureRecognizer(
@@ -324,10 +322,10 @@ struct TVNativePlayer: UIViewControllerRepresentable {
         ) {
             MainActor.assumeIsolated {
                 tvPlayerLog.debug("[transportBar] visible=\(visible)")
-                // Either way the bar's own lifecycle now drives the strip (a reported
-                // appearance is always followed by a reported hide).
-                transportBarSafetyHide?.cancel()
-                setTransportBarVisible(visible)
+                attachSegmentStrip()
+            }
+            coordinator.addCoordinatedAnimations(nil) { [weak self] _ in
+                Task { @MainActor in self?.attachSegmentStrip() }
             }
         }
 
@@ -340,7 +338,7 @@ struct TVNativePlayer: UIViewControllerRepresentable {
             playingObservation = nil
             pausedStartFallback?.cancel()
             artworkTask?.cancel()
-            transportBarSafetyHide?.cancel()
+            segmentStrip.removeFromSuperview()
         }
 
         func apply(state: TVPlayerMenuState) {
@@ -643,8 +641,6 @@ struct TVPlayerErrorPanel: View {
 /// What AVPlayerViewController is showing, for the SwiftUI layers drawn over it.
 @MainActor @Observable
 final class TVPlayerPresentationState {
-    /// The transport bar is on screen.
-    var isVisible = false
     /// The video's first frame is on screen (`isReadyForDisplay`). Until then the loading
     /// backdrop stays up, so there's no black frame with a second spinner between the
     /// backdrop and the picture (e.g. while a resume position is being sought).

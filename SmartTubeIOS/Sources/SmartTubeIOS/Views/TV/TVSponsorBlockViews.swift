@@ -1,52 +1,114 @@
 #if os(tvOS)
 import SmartTubeIOSCore
 import SwiftUI
+import UIKit
 
 // MARK: - SponsorBlock segments on the scrubber
 
-/// Colours SponsorBlock segments onto the native scrubber while the transport bar is up.
-/// AVPlayerViewController offers no API to annotate its progress bar (interstitial
-/// ranges are treated as ad breaks: they collapse the timeline and restart the clock),
-/// so the segments are drawn over it, aligned to where tvOS lays the bar out.
-struct TVSponsorSegmentsTrack: View {
-    let segments: [SponsorSegment]
-    let duration: TimeInterval
-    let isVisible: Bool
+/// A thin strip of SponsorBlock segments just above the native scrubber. It lives inside
+/// AVPlayerViewController's own transport bar (see `attach(toTransportBarIn:)`) and fades
+/// with the bar's track, in the same animation — nothing has to guess when the bar is up.
+/// AVKit has no public API for annotating the bar (interstitial time ranges are treated as
+/// ad breaks: they collapse the timeline and restart the clock).
+final class TVSponsorSegmentStrip: UIView {
+    private static let height: CGFloat = 6
+    /// Space between the strip and the track below it.
+    private static let gap: CGFloat = 6
 
-    /// The native scrubber's track in screen points (1920×1080), measured in the tvOS simulator.
-    private static let trackX: ClosedRange<CGFloat> = 80...1840
-    private static let trackMidY: CGFloat = 909.5
-    private static let segmentHeight: CGFloat = 13
+    private var segments: [SponsorSegment] = []
+    private var duration: TimeInterval = 0
+    /// The track container whose opacity the strip copies.
+    private weak var fadingTrack: UIView?
+    private var fadeObservation: NSKeyValueObservation?
 
-    var body: some View {
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        isUserInteractionEnabled = false
+        autoresizingMask = [.flexibleWidth, .flexibleBottomMargin]
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    func update(segments: [SponsorSegment], duration: TimeInterval) {
         let drawable = segments.filter { $0.category != .poiHighlight && $0.end > $0.start }
-        if isVisible, duration > 0, !drawable.isEmpty {
-            let width = Self.trackX.upperBound - Self.trackX.lowerBound
-            ZStack(alignment: .topLeading) {
-                ForEach(drawable) { segment in
-                    let start = max(0, min(segment.start / duration, 1))
-                    let end = max(start, min(segment.end / duration, 1))
-                    // Flat edges, like a stretch of the scrubber; only an end that reaches the
-                    // track's own (rounded) end is rounded to match it.
-                    let radius = Self.segmentHeight / 2
-                    let roundsStart = start * width < 1
-                    let roundsEnd = (1 - end) * width < 1
-                    UnevenRoundedRectangle(
-                        topLeadingRadius: roundsStart ? radius : 0, bottomLeadingRadius: roundsStart ? radius : 0,
-                        bottomTrailingRadius: roundsEnd ? radius : 0, topTrailingRadius: roundsEnd ? radius : 0,
-                        style: .continuous
-                    )
-                    .fill(segment.category.color.opacity(0.9))
-                    .frame(width: max(4, (end - start) * width), height: Self.segmentHeight)
-                    .offset(
-                        x: Self.trackX.lowerBound + start * width,
-                        y: Self.trackMidY - Self.segmentHeight / 2)
-                }
-            }
-            .frame(width: 1920, height: 1080, alignment: .topLeading)
-            .ignoresSafeArea()
-            .allowsHitTesting(false)
-            .transition(.opacity)
+        guard drawable != self.segments || duration != self.duration else { return }
+        self.segments = drawable
+        self.duration = duration
+        drawSegments()
+    }
+
+    /// Puts the strip into the transport bar, if tvOS has created it. Returns whether it's in.
+    @discardableResult
+    func attach(toTransportBarIn root: UIView) -> Bool {
+        guard let track = Self.fadingTrack(in: root), let bar = Self.transportBar(containing: track) else {
+            return false
+        }
+        if superview !== bar { bar.addSubview(self) }
+        if fadingTrack !== track { follow(track) }
+        let target = CGRect(x: 0, y: -(Self.height + Self.gap), width: bar.bounds.width, height: Self.height)
+        if frame != target {
+            frame = target
+            drawSegments()
+        }
+        return true
+    }
+
+    /// Copies the track's opacity. AVKit fades it inside an animation block, and the copy is
+    /// made synchronously from the KVO callback — inside that same block — so the strip fades
+    /// with the same timing and curve.
+    private func follow(_ track: UIView) {
+        fadingTrack = track
+        alpha = track.alpha
+        fadeObservation = track.layer.observe(\.opacity, options: [.new]) { [weak self] layer, _ in
+            let opacity = CGFloat(layer.opacity)
+            MainActor.assumeIsolated { self?.alpha = opacity }
+        }
+    }
+
+    /// AVKit's transport bar (`AVNowPlayingTransportBar` on tvOS 26): it spans the track and
+    /// doesn't clip, so the strip can sit above the track.
+    private static func transportBar(containing track: UIView) -> UIView? {
+        var view = track.superview
+        while let current = view {
+            if NSStringFromClass(type(of: current)).contains("TransportBar") { return current }
+            view = current.superview
+        }
+        return nil
+    }
+
+    /// The part of AVKit's transport bar that fades out when the bar hides — the container
+    /// holding its interstitial-marker view. The bar view itself is drawn through a portal
+    /// that ignores its own hidden state, and the container clips to the track, so the strip
+    /// is a subview of the bar and copies this container's opacity.
+    private static func fadingTrack(in view: UIView) -> UIView? {
+        if NSStringFromClass(type(of: view)).contains("TransportBarInterstitialView") { return view.superview }
+        for subview in view.subviews {
+            if let found = fadingTrack(in: subview) { return found }
+        }
+        return nil
+    }
+
+    /// Drawn directly rather than in `layoutSubviews`: AVKit's bar doesn't give its subviews
+    /// a layout pass.
+    private func drawSegments() {
+        layer.sublayers?.forEach { $0.removeFromSuperlayer() }
+        guard duration > 0, bounds.width > 0 else { return }
+        let width = bounds.width
+        for segment in segments {
+            let start = max(0, min(segment.start / duration, 1))
+            let end = max(start, min(segment.end / duration, 1))
+            let piece = CALayer()
+            piece.frame = CGRect(x: start * width, y: 0, width: max(3, (end - start) * width), height: bounds.height)
+            piece.backgroundColor = UIColor(segment.category.color).withAlphaComponent(0.9).cgColor
+            // Flat edges, like a stretch of the bar; an end that reaches the bar's own rounded
+            // end is rounded to match.
+            var corners: CACornerMask = []
+            if start * width < 1 { corners.formUnion([.layerMinXMinYCorner, .layerMinXMaxYCorner]) }
+            if (1 - end) * width < 1 { corners.formUnion([.layerMaxXMinYCorner, .layerMaxXMaxYCorner]) }
+            piece.cornerRadius = corners.isEmpty ? 0 : bounds.height / 2
+            piece.maskedCorners = corners
+            layer.addSublayer(piece)
         }
     }
 }

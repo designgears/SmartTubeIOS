@@ -1,71 +1,45 @@
 #if os(tvOS)
 import AVKit
-import SwiftUI
+import SmartTubeIOSCore
 import UIKit
 
-// MARK: - Transport-bar visibility
+// MARK: - SponsorBlock strip in the transport bar
 
-// Whether the transport bar is up, for the SponsorBlock strip drawn over it.
-// `willTransitionToVisibilityOfTransportBar` always reports the bar hiding, but not the
-// bar appearing for left/right skips and scrubbing. So those also count as "bar showing";
-// the delegate's hide event ends it, with a safety timeout in case the bar never actually
-// appeared. The timeout only runs once the remote is let go — scrubbing (holding
-// left/right, or swiping the touch surface) keeps the bar up for as long as it lasts —
-// and never while paused, when the bar stays up.
-// (Select/Play-Pause are left to the delegate: resuming doesn't always show the bar.)
+// The strip is a subview of AVKit's own transport bar and fades with its track
+// (`TVSponsorSegmentStrip`). The only job here is getting it in: tvOS may build the bar
+// only when it first appears (a remote press or touch), and may rebuild it later, so the
+// strip is re-attached after any remote interaction and whenever the bar reports a change.
 extension TVNativePlayer.Coordinator {
-    func installInteractionRecognizers(on view: UIView) {
-        // Down shows the strip and holds it; release starts the countdown.
-        let presses = UILongPressGestureRecognizer(target: self, action: #selector(pressChanged))
+    func installSegmentStrip(on view: UIView) {
+        // Observe only (`shouldRecognizeSimultaneouslyWith`), never consume input.
+        let presses = UILongPressGestureRecognizer(target: self, action: #selector(remoteTouched))
         presses.minimumPressDuration = 0
-        let pressTypes: [UIPress.PressType] = [.leftArrow, .rightArrow]
-        presses.allowedPressTypes = pressTypes.map { NSNumber(value: $0.rawValue) }
         presses.allowedTouchTypes = []
         presses.cancelsTouchesInView = false
         presses.delegate = self
         view.addGestureRecognizer(presses)
 
-        let swipes = UIPanGestureRecognizer(target: self, action: #selector(touchSurfaceChanged))
+        let swipes = UIPanGestureRecognizer(target: self, action: #selector(remoteTouched))
         swipes.allowedTouchTypes = [NSNumber(value: UITouch.TouchType.indirect.rawValue)]
         swipes.cancelsTouchesInView = false
         swipes.delegate = self
         view.addGestureRecognizer(swipes)
     }
 
-    @objc private func pressChanged(_ recognizer: UIGestureRecognizer) {
-        remoteInteraction(recognizer.state)
+    func updateSegmentStrip(segments: [SponsorSegment], duration: TimeInterval) {
+        segmentStrip.update(segments: segments, duration: duration)
+        attachSegmentStrip()
     }
 
-    @objc private func touchSurfaceChanged(_ recognizer: UIGestureRecognizer) {
-        // A swipe scrubs only while the bar is up; it doesn't bring the bar up.
-        guard transportBar?.isVisible == true else { return }
-        remoteInteraction(recognizer.state)
+    func attachSegmentStrip() {
+        guard let root = playerView else { return }
+        segmentStrip.attach(toTransportBarIn: root)
     }
 
-    private func remoteInteraction(_ state: UIGestureRecognizer.State) {
-        switch state {
-        case .began, .changed:
-            setTransportBarVisible(true)
-            transportBarSafetyHide?.cancel()
-        case .ended, .cancelled, .failed:
-            scheduleSafetyHide()
-        default:
-            break
-        }
-    }
-
-    private func scheduleSafetyHide() {
-        transportBarSafetyHide?.cancel()
-        transportBarSafetyHide = Task { [weak self] in
-            try? await Task.sleep(for: Self.transportBarSafetyTimeout)
-            guard !Task.isCancelled, let self else { return }
-            // Paused (e.g. mid-scrub) the bar stays up: look again later.
-            if self.vm?.player.timeControlStatus == .paused {
-                self.scheduleSafetyHide()
-            } else {
-                self.setTransportBarVisible(false)
-            }
-        }
+    @objc private func remoteTouched(_ recognizer: UIGestureRecognizer) {
+        guard recognizer.state == .began else { return }
+        // After this event is handled, by which time AVKit has brought up (or built) the bar.
+        Task { @MainActor [weak self] in self?.attachSegmentStrip() }
     }
 }
 #endif
