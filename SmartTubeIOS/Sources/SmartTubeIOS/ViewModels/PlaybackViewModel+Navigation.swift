@@ -52,16 +52,27 @@ extension PlaybackViewModel {
 
     // MARK: - Navigation
 
+    /// `candidates` minus the current video and, with Settings › Skip When Playing Next on,
+    /// the ones already watched (music excepted — see `WatchedPolicy`).
+    func unwatchedCandidates(_ candidates: [Video]) -> [Video] {
+        let others = candidates.filter { $0.id != currentVideo?.id }
+        guard settings.skipWatchedWhenPlayingNext else { return others }
+        return WatchedStore.shared.unwatched(others, policy: WatchedPolicy(settings: settings))
+    }
+
     /// Play the next related video. Advances through the Current Queue if one is
-    /// active; otherwise falls back to the first related (suggestion) video.
+    /// active; otherwise falls back to the first related (suggestion) video. Watched videos
+    /// are passed over when there's anything else to play.
     public func playNext() {
         if let idx = currentVideo?.playlistIndex,
             currentVideo?.playlistId == CurrentQueueStore.playlistID
         {
             Task {
-                if let next = await CurrentQueueStore.shared.videoAt(index: idx + 1) {
-                    playerLog.notice("playNext (queue): index=\(idx + 1) id=\(next.id)")
-                    prefetchQueueVideo(at: idx + 2)
+                let remaining = await CurrentQueueStore.shared.remainingVideos(after: idx)
+                if let next = unwatchedCandidates(remaining).first ?? remaining.first {
+                    let nextIndex = next.playlistIndex ?? idx + 1
+                    playerLog.notice("playNext (queue): index=\(nextIndex) id=\(next.id)")
+                    prefetchQueueVideo(at: nextIndex + 1)
                     DiagnosticsLogger.setIntendedVideo(id: next.id, title: next.title)
                     load(video: next)
                 } else {
@@ -76,7 +87,7 @@ extension PlaybackViewModel {
     }
 
     private func playNextFromSuggestions() {
-        guard let next = relatedVideos.first else { return }
+        guard let next = unwatchedCandidates(relatedVideos).first ?? relatedVideos.first else { return }
         playerLog.notice("playNext: id=\(next.id)")
         DiagnosticsLogger.setIntendedVideo(id: next.id, title: next.title)
         load(video: next)
@@ -122,8 +133,10 @@ extension PlaybackViewModel {
             currentVideo?.playlistId == CurrentQueueStore.playlistID
         {
             Task {
+                // Autoplay never lands on a watched video: if only watched ones are left,
+                // the queue counts as finished.
+                let remaining = unwatchedCandidates(await CurrentQueueStore.shared.remainingVideos(after: idx))
                 if settings.queueShuffleEnabled {
-                    let remaining = await CurrentQueueStore.shared.remainingVideos(after: idx)
                     if let pick = remaining.randomElement() {
                         playerLog.notice("Autoplay (queue, shuffle): random id=\(pick.id)")
                         DiagnosticsLogger.setIntendedVideo(id: pick.id, title: pick.title)
@@ -134,9 +147,10 @@ extension PlaybackViewModel {
                         autoplayFromRecommendations()
                     }
                 } else {
-                    if let next = await CurrentQueueStore.shared.videoAt(index: idx + 1) {
-                        playerLog.notice("Autoplay (queue): index=\(idx + 1) id=\(next.id)")
-                        prefetchQueueVideo(at: idx + 2)
+                    if let next = remaining.first {
+                        let nextIndex = next.playlistIndex ?? idx + 1
+                        playerLog.notice("Autoplay (queue): index=\(nextIndex) id=\(next.id)")
+                        prefetchQueueVideo(at: nextIndex + 1)
                         DiagnosticsLogger.setIntendedVideo(id: next.id, title: next.title)
                         load(video: next)
                     } else {
@@ -156,14 +170,14 @@ extension PlaybackViewModel {
     /// is enabled, otherwise autoplays the first related video if autoplay is
     /// enabled, otherwise marks the video as ended.
     private func autoplayFromRecommendations() {
-        if settings.shuffleEnabled, !relatedVideos.isEmpty {
-            let pick = relatedVideos[Int.random(in: 0..<relatedVideos.count)]
+        let candidates = unwatchedCandidates(relatedVideos)
+        if settings.shuffleEnabled, let pick = candidates.randomElement() {
             playerLog.notice("Shuffle: loading id=\(pick.id)")
             DiagnosticsLogger.setIntendedVideo(id: pick.id, title: pick.title)
             load(video: pick)
             return
         }
-        guard settings.autoplayEnabled, let next = relatedVideos.first else {
+        guard settings.autoplayEnabled, let next = candidates.first else {
             videoEnded = true
             return
         }

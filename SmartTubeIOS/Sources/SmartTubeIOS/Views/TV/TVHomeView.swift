@@ -58,6 +58,7 @@ struct TVHomeView: View {
                         TVVideoCard(video: video, removal: continueWatchingRemoval(video)) {
                             navigator.play(video)
                         }
+                        .environment(\.dimsWatchedVideos, false)
                     }
                 }
 
@@ -157,7 +158,7 @@ struct TVHomeView: View {
 
     private var recommendedAll: [Video] {
         let source = isSignedIn ? (homeVM?.homeRegularVideos ?? []) : (popularVM?.videoGroups.flatMap(\.videos) ?? [])
-        return source.filter { !$0.isShort }.uniquedByID()
+        return source.filter { !$0.isShort }.uniquedByID().hidingWatched(in: .recommended, settings: store.settings)
     }
 
     private var showsHero: Bool { store.settings.showHomeHero }
@@ -173,12 +174,16 @@ struct TVHomeView: View {
     private var subscriptionVideos: [Video] {
         guard isSignedIn else { return [] }
         let subs = homeVM?.sections.first { $0.section.type == .subscriptions }?.videos ?? []
-        return Array(subs.filter { !$0.isShort }.uniquedByID().prefix(30))
+        return Array(
+            subs.filter { !$0.isShort }.uniquedByID().hidingWatched(in: .subscriptions, settings: store.settings)
+                .prefix(30))
     }
 
     private var shorts: [Video] {
         guard !hideShorts, isSignedIn else { return [] }
-        return Array((homeVM?.homeShortsVideos ?? []).uniquedByID().prefix(30))
+        return Array(
+            (homeVM?.homeShortsVideos ?? []).uniquedByID().hidingWatched(in: .shorts, settings: store.settings)
+                .prefix(30))
     }
 
     private var continueWatching: [Video] {
@@ -324,10 +329,12 @@ struct TVSectionShelf: View {
 
     @Environment(\.innerTubeAPI) private var api
     @Environment(TVNavigator.self) private var navigator
+    @Environment(SettingsStore.self) private var store
     @State private var vm: BrowseViewModel?
 
     var body: some View {
         let videos = (vm?.videoGroups.flatMap(\.videos) ?? []).filter { !$0.isShort }.uniquedByID()
+            .hidingWatched(in: type, settings: store.settings)
         Group {
             if videos.isEmpty, vm == nil || vm?.isLoading == true {
                 // Same footprint as the loaded shelf, so nothing jumps when it arrives.

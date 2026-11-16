@@ -119,6 +119,7 @@ struct TVVideoCard: View {
                 TVVideoCaption(video: video)
                     .frame(width: width, height: TVLayout.cardCaptionHeight, alignment: .topLeading)
             }
+            .dimmedIfWatched(video)
         }
         .buttonStyle(.borderless)
         .contextMenu { TVVideoContextMenu(video: video, removal: removal) }
@@ -181,6 +182,7 @@ struct TVShortCard: View {
                 TVVideoCaption(video: video, titleFont: .caption.weight(.semibold), showsChannel: false)
                     .frame(width: TVLayout.shortWidth, height: 64, alignment: .topLeading)
             }
+            .dimmedIfWatched(video)
         }
         .buttonStyle(.borderless)
         .contextMenu { TVVideoContextMenu(video: video) }

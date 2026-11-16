@@ -55,6 +55,7 @@ struct TVFeedView: View {
     @ViewBuilder private var content: some View {
         let videos = visibleVideos
         if let vm, !videos.isEmpty {
+            // History is all watched by definition: no point fading it.
             TVVideoGrid(
                 videos: videos,
                 onReachEnd: {
@@ -62,6 +63,7 @@ struct TVFeedView: View {
                 },
                 onSelect: { navigator.play($0) }
             )
+            .environment(\.dimsWatchedVideos, type != .history)
         } else if vm == nil || vm?.isLoading == true {
             TVLoadingView().frame(height: 700)
         } else if needsSignIn {
@@ -94,6 +96,7 @@ struct TVFeedView: View {
 
     private var visibleVideos: [Video] {
         let all = (vm?.videoGroups.flatMap(\.videos) ?? []).uniquedByID()
+            .hidingWatched(in: type, settings: store.settings)
         guard store.settings.hideShorts, type != .shorts else { return all }
         return all.filter { !$0.isShort }
     }

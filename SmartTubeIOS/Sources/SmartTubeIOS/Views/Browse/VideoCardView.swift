@@ -84,6 +84,7 @@ public struct VideoCardView: View {
                 gridLayout
             }
         }
+        .dimmedIfWatched(video)
         .task {
             localProgress = await VideoStateStore.shared.state(for: video.id)?.watchedFraction
         }

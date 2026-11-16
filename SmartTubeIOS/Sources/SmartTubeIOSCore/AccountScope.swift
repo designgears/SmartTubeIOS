@@ -71,6 +71,7 @@ public enum AccountScope {
 
         settingsSwitcher?(outgoing, incoming, isNewAccount)
         LocalWatchHistoryStore.shared.switchAccountData(from: outgoing, to: incoming)
+        WatchedStore.shared.switchAccountData(from: outgoing, to: incoming)
         WatchLaterMembershipStore.shared.switchAccountData(from: outgoing, to: incoming)
         await VideoStateStore.shared.switchAccountData(from: outgoing, to: incoming)
         await SearchHistoryStore.shared.switchAccountData(from: outgoing, to: incoming)

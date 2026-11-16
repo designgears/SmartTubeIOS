@@ -107,6 +107,7 @@ public final class WatchtimeTracker {
                 "transition flush: videoId=\(oldVideoId, privacy: .public) st=\(Int(segStart))s et=\(Int(flushPosition))s final=\(isFinal, privacy: .public)"
             )
             await VideoStateStore.shared.save(videoId: oldVideoId, position: flushPosition, duration: flushDuration)
+            await WatchedStore.shared.record(videoId: oldVideoId, position: flushPosition, duration: flushDuration)
             // The playback ping must precede the watchtime ping — YouTube ignores
             // standalone watchtime pings.
             await api.reportPlaybackStarted(
@@ -215,6 +216,7 @@ public final class WatchtimeTracker {
         }
 
         await VideoStateStore.shared.save(videoId: vid, position: position, duration: duration)
+        WatchedStore.shared.record(videoId: vid, position: position, duration: duration)
 
         if needsNewRecord || isFinal {
             trackerLog.notice(
@@ -238,7 +240,9 @@ public final class WatchtimeTracker {
 
     /// Flushes the segment before a seek and starts the next segment at the target.
     /// This mirrors Android SmartTube's onSeekPositionChanged history update.
-    public func recordSeek(to targetPosition: TimeInterval, from currentPosition: TimeInterval, duration: TimeInterval) async {
+    public func recordSeek(
+        to targetPosition: TimeInterval, from currentPosition: TimeInterval, duration: TimeInterval
+    ) async {
         guard !videoId.isEmpty, duration > 0 else { return }
         if didReportFinal {
             // Rewatching after the final ping (Loop replays via seekTo(0), or a seek back out of

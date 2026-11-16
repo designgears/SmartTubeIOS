@@ -501,6 +501,8 @@ public final class BrowseViewModel {
             // history returns (best-effort — signed-out/failed fetches just yield local).
             let local = localHistory.videos
             let remote: VideoGroup? = try? await api.fetchHistory()
+            // What YouTube says was watched, for dimming/hiding/skipping (WatchedStore).
+            WatchedStore.shared.absorbHistory(remote?.videos ?? [])
             if !Task.isCancelled {
                 var group = remote ?? VideoGroup(title: "History", videos: [])
                 group.videos = Video.mergedHistory(local: local, remote: group.videos)
@@ -708,6 +710,7 @@ public final class BrowseViewModel {
                 let group = try await retryWithBackoff(label: "BrowseVM[\(section.title)]") {
                     try await api.fetchHistory(continuationToken: token)
                 }
+                WatchedStore.shared.absorbHistory(group.videos)
                 if Task.isCancelled {
                     browseLog.notice("fetchNextPage cancelled: section=\(section.title)")
                 } else {

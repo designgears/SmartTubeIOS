@@ -60,13 +60,20 @@ public struct AppSettings: Codable {
     public var compactThumbnails: Bool
     /// Loads 1280×720 CDN thumbnails instead of the smaller API-provided ones.
     public var highResThumbnails: Bool
-    /// #121: hides videos from Home/Subscriptions once their watched fraction
-    /// (`Video.watchProgress`, YouTube's own resume-progress signal) reaches
-    /// `hideWatchedThreshold`. History is deliberately never filtered by this —
-    /// watched videos are the entire point of that section.
-    public var hideWatchedVideos: Bool
-    /// 0.0...1.0 — how far into a video counts as "watched" for `hideWatchedVideos`.
+    // MARK: Watched videos (see `WatchedPolicy`)
+    /// Fades watched videos' cards.
+    public var dimWatchedVideos: Bool
+    /// Leaves watched videos out of Home, Subscriptions and Explore. History and Continue
+    /// Watching are never filtered — watched videos are their point.
+    public var hideWatchedInFeeds: Bool
+    /// When the next video is picked (autoplay, Next, queues, playlists), passes over watched ones.
+    public var skipWatchedWhenPlayingNext: Bool
+    /// 0.5...1.0 — how much of a video has to have been seen to count as watched.
     public var hideWatchedThreshold: Double
+    /// Music and music videos only count as watched when this is on.
+    public var watchedIncludesMusic: Bool
+    /// Also count what YouTube says was watched (its watch history and feeds' resume bars).
+    public var watchedUsesYouTubeHistory: Bool
     /// How the app's own translucent surfaces look (player controls, mini player, panels).
     /// iOS's Liquid Glass on system chrome (tab/navigation bars, sheets, menus) can't be
     /// turned off by an app — Xcode 27 removed `UIDesignRequiresCompatibility` — so those
@@ -294,8 +301,12 @@ public struct AppSettings: Codable {
         defaultSection = BrowseSection.SectionType.home.rawValue
         compactThumbnails = false
         highResThumbnails = false
-        hideWatchedVideos = false
+        dimWatchedVideos = true
+        hideWatchedInFeeds = true
+        skipWatchedWhenPlayingNext = true
         hideWatchedThreshold = 0.9
+        watchedIncludesMusic = false
+        watchedUsesYouTubeHistory = true
         glassStyle = .standard
         disableAnalytics = false
         settingsPINHash = nil
@@ -387,8 +398,12 @@ extension AppSettings {
         case defaultSection
         case compactThumbnails
         case highResThumbnails
-        case hideWatchedVideos
+        case dimWatchedVideos
+        case hideWatchedInFeeds
+        case skipWatchedWhenPlayingNext
         case hideWatchedThreshold
+        case watchedIncludesMusic
+        case watchedUsesYouTubeHistory
         case glassStyle
         case disableAnalytics
         case settingsPINHash
@@ -457,7 +472,13 @@ extension AppSettings {
         defaultSection = c.safeDecode(String.self, forKey: .defaultSection, default: d.defaultSection)
         compactThumbnails = c.safeDecode(Bool.self, forKey: .compactThumbnails, default: d.compactThumbnails)
         highResThumbnails = c.safeDecode(Bool.self, forKey: .highResThumbnails, default: d.highResThumbnails)
-        hideWatchedVideos = c.safeDecode(Bool.self, forKey: .hideWatchedVideos, default: d.hideWatchedVideos)
+        dimWatchedVideos = c.safeDecode(Bool.self, forKey: .dimWatchedVideos, default: d.dimWatchedVideos)
+        hideWatchedInFeeds = c.safeDecode(Bool.self, forKey: .hideWatchedInFeeds, default: d.hideWatchedInFeeds)
+        skipWatchedWhenPlayingNext = c.safeDecode(
+            Bool.self, forKey: .skipWatchedWhenPlayingNext, default: d.skipWatchedWhenPlayingNext)
+        watchedIncludesMusic = c.safeDecode(Bool.self, forKey: .watchedIncludesMusic, default: d.watchedIncludesMusic)
+        watchedUsesYouTubeHistory = c.safeDecode(
+            Bool.self, forKey: .watchedUsesYouTubeHistory, default: d.watchedUsesYouTubeHistory)
         hideWatchedThreshold = c.safeDecode(
             Double.self, forKey: .hideWatchedThreshold, default: d.hideWatchedThreshold)
         glassStyle = c.safeDecode(

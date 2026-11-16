@@ -305,6 +305,8 @@ public struct HomeView: View {
         } else {
             sectionFeed
                 .accessibilityIdentifier("home.sectionContainer")
+                // History is all watched by definition: no point fading it.
+                .environment(\.dimsWatchedVideos, selectedSection.type != .history)
         }
     }
 
@@ -413,9 +415,9 @@ public struct HomeView: View {
         let hideVideoPremieres = store.settings.hideVideoPremieres
         let isShorts = selectedSection.type == .shorts
         let applyHideShorts = hideShorts && selectedSection.type != .history
-        // #121: History is the one place watched videos are the point — never filtered.
-        let applyHideWatched = store.settings.hideWatchedVideos && selectedSection.type != .history
-        let hideWatchedThreshold = store.settings.hideWatchedThreshold
+        // #121: watched videos leave the feeds that hide them (never History) — see WatchedPolicy.
+        let applyHideWatched = store.settings.hidesWatched(in: selectedSection.type)
+        let watchedPolicy = store.settings.watchedPolicy
         // #62: channel filter only applies to (and is only shown for) Subscriptions —
         // it wouldn't make sense for a single-source list like a specific Channel page,
         // and Home mixes recommendations that don't necessarily come from a subscription.
@@ -444,7 +446,7 @@ public struct HomeView: View {
             if applyHideShorts { videos = videos.filter { !$0.isShort } }
             if hideLiveShorts { videos = videos.filter { !($0.isLive && $0.isShort) } }
             if hideVideoPremieres { videos = videos.filter { !$0.isUpcoming } }
-            if applyHideWatched { videos = videos.filter { !$0.isWatched(threshold: hideWatchedThreshold) } }
+            if applyHideWatched { videos = WatchedStore.shared.unwatched(videos, policy: watchedPolicy) }
             if let channelFilter { videos = videos.filter { $0.channelId == channelFilter } }
             copy.videos = videos
             return copy
@@ -460,7 +462,7 @@ public struct HomeView: View {
             .filter { !applyHideShorts || !$0.isShort }
             .filter { !hideLiveShorts || !($0.isLive && $0.isShort) }
             .filter { !hideVideoPremieres || !$0.isUpcoming }
-            .filter { !applyHideWatched || !$0.isWatched(threshold: hideWatchedThreshold) }
+            .filter { !applyHideWatched || !WatchedStore.shared.isWatched($0, policy: watchedPolicy) }
             .filter { channelFilter == nil || $0.channelId == channelFilter }
             .filter { isShorts || !$0.isShort }
 

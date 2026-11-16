@@ -31,6 +31,7 @@ public struct SettingsView: View {
             AccountSettingsSection()
             PlaybackSettingsSection()
             FeedSettingsSection()
+            WatchedSettingsSection()
             #if !os(tvOS)
             AppearanceSettingsSection()
             #endif
