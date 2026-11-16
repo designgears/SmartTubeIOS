@@ -649,11 +649,11 @@ extension InnerTubeAPI {
                     guard let text = (item["lineItemRenderer"] as? [String: Any])?["text"] as? [String: Any],
                         let str = extractText(text)
                     else { continue }
-                    if let date = parseRelativeDate(str) {
-                        publishedTimeText = str
-                        tubeLog.notice(
-                            "tileRenderer id=\(videoId, privacy: .public) publishedTimeText='\(str, privacy: .public)'")
-                        return date
+                    // Just the age: the item can be "1.4B views • 5mo ago", whose views are
+                    // shown separately (they'd appear twice).
+                    if let age = RelativeAge(str) {
+                        publishedTimeText = age.text
+                        return age.date()
                     }
                     // Upcoming/scheduled: "Scheduled for 5/27/26, 4:00 PM"
                     if let date = parseScheduledDate(str) {

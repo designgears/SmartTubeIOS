@@ -502,9 +502,8 @@ public final class BrowseViewModel {
             let local = localHistory.videos
             let remote: VideoGroup? = try? await api.fetchHistory()
             if !Task.isCancelled {
-                let localIds = Set(local.map(\.id))
                 var group = remote ?? VideoGroup(title: "History", videos: [])
-                group.videos = local + group.videos.filter { !localIds.contains($0.id) }
+                group.videos = Video.mergedHistory(local: local, remote: group.videos)
                 isAuthRequired = group.videos.isEmpty
                 videoGroups = group.videos.isEmpty ? [] : [group]
             }

@@ -191,3 +191,27 @@ public extension Video {
         URL(string: "https://i.ytimg.com/vi/\(id)/oardefault.jpg")
     }
 }
+
+// MARK: - History merge
+
+public extension Video {
+    /// The History list: on-device entries first (YouTube doesn't always credit device-code
+    /// watches), then the account's own. An on-device entry missing views or a date (saved
+    /// before they were kept) takes them from the account's copy of the same video.
+    static func mergedHistory(local: [Video], remote: [Video]) -> [Video] {
+        let remoteById = Dictionary(remote.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let enriched = local.map { video -> Video in
+            guard let account = remoteById[video.id] else { return video }
+            var video = video
+            if video.viewCount == nil { video.viewCount = account.viewCount }
+            if video.publishedAt == nil, video.publishedTimeText == nil {
+                video.publishedAt = account.publishedAt
+                video.publishedTimeText = account.publishedTimeText
+            }
+            if video.duration == nil { video.duration = account.duration }
+            return video
+        }
+        let localIds = Set(local.map(\.id))
+        return enriched + remote.filter { !localIds.contains($0.id) }
+    }
+}

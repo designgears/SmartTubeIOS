@@ -134,7 +134,8 @@ extension Video {
         }
         if viewCount != nil { parts.append(formattedViewCount) }
         if !isLive, let date = publishedTimeText?.trimmingCharacters(in: .whitespaces), !date.isEmpty {
-            parts.append(date)
+            // Only the age: some sources put views in the same text ("1.4B views • 5mo ago").
+            parts.append(RelativeAge(date)?.text ?? date)
         } else if !isLive, let publishedAt {
             parts.append(publishedAt.formatted(.relative(presentation: .named)))
         }

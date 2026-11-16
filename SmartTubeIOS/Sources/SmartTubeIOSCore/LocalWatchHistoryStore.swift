@@ -56,10 +56,14 @@ public final class LocalWatchHistoryStore {
     /// kept — per-fetch state like tracking tokens is dropped so stale tokens are never
     /// replayed from disk.
     public func record(_ video: Video, at date: Date = Date()) {
+        // Views and the publish date too, so history cards read like any other. The date is
+        // kept absolute (not "9 hours ago", which would freeze at the time of watching).
         let slim = Video(
             id: video.id, title: video.title, channelTitle: video.channelTitle,
             channelId: video.channelId, thumbnailURL: video.thumbnailURL,
-            duration: video.duration, isLive: video.isLive, isShort: video.isShort)
+            duration: video.duration, viewCount: video.viewCount,
+            publishedAt: video.publishedAt ?? video.publishedTimeText.flatMap { RelativeAge($0)?.date(before: date) },
+            isLive: video.isLive, isShort: video.isShort)
         entries.removeAll { $0.video.id == video.id }
         entries.insert(LocalWatchHistoryEntry(video: slim, watchedAt: date), at: 0)
         if entries.count > Self.maxEntries { entries.removeLast(entries.count - Self.maxEntries) }

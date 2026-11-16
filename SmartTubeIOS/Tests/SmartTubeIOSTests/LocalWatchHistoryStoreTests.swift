@@ -77,4 +77,47 @@ struct LocalWatchHistoryStoreTests {
         #expect(store.videos.first?.title == "Title a")
         #expect(store.videos.first?.notInterestedToken == nil)
     }
+
+    /// History cards show views and age like any other, so both are kept — the age as a date.
+    @Test("keeps views and the publish date")
+    func keepsViewsAndDate() {
+        let (store, defaults, suite) = makeStore()
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let watched = Date(timeIntervalSince1970: 1_000_000)
+        var played = video("a")
+        played.viewCount = 1_600_000
+        played.publishedTimeText = "9 hours ago"
+        store.record(played, at: watched)
+        let saved = store.videos.first
+        #expect(saved?.viewCount == 1_600_000)
+        #expect(saved?.publishedAt == watched.addingTimeInterval(-9 * 3_600))
+        #expect(saved?.publishedTimeText == nil, "relative text would freeze at the time of watching")
+    }
+}
+
+@Suite("Video.mergedHistory")
+struct HistoryMergeTests {
+    @Test func localFirstAccountAfterWithoutDuplicates() {
+        let local = [Video(id: "a", title: "A", channelTitle: "C"), Video(id: "b", title: "B", channelTitle: "C")]
+        let remote = [Video(id: "b", title: "B", channelTitle: "C"), Video(id: "c", title: "C", channelTitle: "C")]
+        #expect(Video.mergedHistory(local: local, remote: remote).map(\.id) == ["a", "b", "c"])
+    }
+
+    /// Entries saved before views/dates were kept borrow them from the account's copy.
+    @Test func fillsMissingViewsAndDateFromTheAccount() {
+        let local = [Video(id: "a", title: "A", channelTitle: "NFL")]
+        let remote = [
+            Video(id: "a", title: "A", channelTitle: "NFL", viewCount: 1_600_000, publishedTimeText: "10 hours ago")
+        ]
+        let merged = Video.mergedHistory(local: local, remote: remote)
+        #expect(merged.count == 1)
+        #expect(merged.first?.viewCount == 1_600_000)
+        #expect(merged.first?.publishedTimeText == "10 hours ago")
+    }
+
+    @Test func keepsTheDeviceCopysOwnValues() {
+        let local = [Video(id: "a", title: "A", channelTitle: "NFL", viewCount: 5)]
+        let remote = [Video(id: "a", title: "A", channelTitle: "NFL", viewCount: 9)]
+        #expect(Video.mergedHistory(local: local, remote: remote).first?.viewCount == 5)
+    }
 }
