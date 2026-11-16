@@ -69,6 +69,8 @@ final class YTHLSProxyLoader: NSObject, AVAssetResourceLoaderDelegate, @unchecke
     let solvesNChallenges: Bool
     private let lock = NSLock()
     private var activeTasks: [ObjectIdentifier: URLSessionDataTask] = [:]
+    /// Media playlists fetched while checking a master, by URL; each is served once.
+    private var prefetched: [String: (data: Data, response: HTTPURLResponse)] = [:]
 
     init(
         ua: String, nSolver: (unsolved: String, solved: String)? = nil,
@@ -99,6 +101,46 @@ final class YTHLSProxyLoader: NSObject, AVAssetResourceLoaderDelegate, @unchecke
             return false
         }
 
+        // A playlist already fetched while checking its master: answer from it.
+        if let prefetched = takePrefetched(realURL) {
+            proxyLog.notice("[HLSProxy] \(realURL.lastPathComponent) served from the master check")
+            handle(loadingRequest, data: prefetched.data, response: prefetched.response, realURL: realURL)
+            return true
+        }
+        let request = makeRequest(for: realURL)
+        proxyLog.notice("[HLSProxy] GET \(realURL.absoluteString.prefix(200))")
+
+        let key = ObjectIdentifier(loadingRequest)
+        let task = URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            guard let self else { return }
+            defer {
+                self.lock.lock()
+                self.activeTasks.removeValue(forKey: key)
+                self.lock.unlock()
+            }
+
+            if let error {
+                proxyLog.error("[HLSProxy] URLSession error: \(error.localizedDescription)")
+                loadingRequest.finishLoading(with: error)
+                return
+            }
+
+            guard let httpResp = response as? HTTPURLResponse, let data else {
+                loadingRequest.finishLoading(with: NSError(domain: "YTHLSProxy", code: -1))
+                return
+            }
+            self.handle(loadingRequest, data: data, response: httpResp, realURL: realURL)
+        }
+
+        lock.lock()
+        activeTasks[key] = task
+        lock.unlock()
+        task.resume()
+        return true
+    }
+
+    /// The request for `realURL`, with the UA, Origin/Referer and cookies the CDN expects.
+    private func makeRequest(for realURL: URL) -> URLRequest {
         var request = URLRequest(url: realURL, timeoutInterval: 30)
         request.setValue(ua, forHTTPHeaderField: "User-Agent")
         // All googlevideo.com requests (both manifest and segment CDN) need Origin/Referer
@@ -124,76 +166,131 @@ final class YTHLSProxyLoader: NSObject, AVAssetResourceLoaderDelegate, @unchecke
                     "[HLSProxy] attaching \(cookies.count) cookies (\(gvCount) googlevideo) to segment request")
             }
         }
-        proxyLog.notice("[HLSProxy] GET \(realURL.absoluteString.prefix(200))")
+        return request
+    }
 
-        let key = ObjectIdentifier(loadingRequest)
-        let task = URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
-            guard let self else { return }
-            defer {
-                self.lock.lock()
-                self.activeTasks.removeValue(forKey: key)
-                self.lock.unlock()
-            }
-
-            if let error {
-                proxyLog.error("[HLSProxy] URLSession error: \(error.localizedDescription)")
-                loadingRequest.finishLoading(with: error)
-                return
-            }
-
-            guard let httpResp = response as? HTTPURLResponse, let data else {
-                loadingRequest.finishLoading(with: NSError(domain: "YTHLSProxy", code: -1))
-                return
-            }
-
-            proxyLog.notice("[HLSProxy] \(realURL.lastPathComponent) HTTP=\(httpResp.statusCode) bytes=\(data.count)")
-            // Log response body for 4xx/5xx to diagnose CDN rejections (n-challenge, auth, etc.)
-            if httpResp.statusCode >= 400 {
-                let errBody = String(data: data.prefix(300), encoding: .utf8) ?? "<binary>"
-                proxyLog.error("[HLSProxy] ERROR body: \(errBody as NSString)")
-            }
-
-            // Determine whether this resource is an HLS playlist.
-            // IMPORTANT: YouTube segment URLs embed "/playlist/index.m3u8/" in their path
-            // (e.g. ".../playlist/index.m3u8/govp/.../file/seg.ts"), so a simple path.contains
-            // check erroneously treats segments as playlists — corrupting binary TS data.
-            // We use the MIME type first, then fall back to whether the path *ends* with m3u8
-            // (last path component), which correctly excludes segment URLs.
-            let mimeTypeLower = (httpResp.value(forHTTPHeaderField: "Content-Type") ?? "").lowercased()
-            let isPlaylist =
-                mimeTypeLower.contains("mpegurl")
-                || realURL.pathExtension.lowercased() == "m3u8"
-                || realURL.lastPathComponent.lowercased() == "index.m3u8"
-            proxyLog.notice(
-                "[HLSProxy] Content-Type=\(httpResp.value(forHTTPHeaderField: "Content-Type") ?? "nil") isPlaylist=\(isPlaylist)"
-            )
-
-            // JS-player-client HLS: solve the scrambled n in media playlists (segment lists).
-            if isPlaylist, self.solvesNChallenges, let text = String(data: data, encoding: .utf8),
-                !(text.contains("#EXT-X-STREAM-INF") || text.contains("#EXT-X-MEDIA:"))
-            {
-                let pending = StreamURLRewriter.hlsNChallenges(in: text)
-                if !pending.isEmpty {
-                    Task {
-                        let solved = await YouTubeJSSolver.shared.solve(n: pending, sig: []).n
-                        proxyLog.notice("[HLSProxy] solved \(solved.count)/\(pending.count) segment n value(s)")
-                        let patched = StreamURLRewriter.replacingHLSN(in: text, solutions: solved)
-                        self.finish(
-                            loadingRequest, data: Data(patched.utf8), realURL: realURL,
-                            isPlaylist: true, mimeTypeLower: mimeTypeLower)
-                    }
-                    return
-                }
-            }
-            self.finish(
-                loadingRequest, data: data, realURL: realURL, isPlaylist: isPlaylist, mimeTypeLower: mimeTypeLower)
+    /// Answers `loadingRequest` with a fetched response: errors fail it; playlists are
+    /// checked (masters), n-solved (media playlists) and rewritten; segments pass through.
+    private func handle(
+        _ loadingRequest: AVAssetResourceLoadingRequest, data: Data, response httpResp: HTTPURLResponse,
+        realURL: URL
+    ) {
+        proxyLog.notice("[HLSProxy] \(realURL.lastPathComponent) HTTP=\(httpResp.statusCode) bytes=\(data.count)")
+        // Log response body for 4xx/5xx to diagnose CDN rejections (n-challenge, auth, etc.)
+        if httpResp.statusCode >= 400 {
+            let errBody = String(data: data.prefix(300), encoding: .utf8) ?? "<binary>"
+            proxyLog.error("[HLSProxy] ERROR body: \(errBody as NSString)")
+            // Never hand AVFoundation an HTML error page dressed as a playlist.
+            loadingRequest.finishLoading(
+                with: NSError(
+                    domain: NSURLErrorDomain, code: NSURLErrorResourceUnavailable,
+                    userInfo: ["HTTPStatusCode": httpResp.statusCode, NSURLErrorFailingURLErrorKey: realURL]))
+            return
         }
 
-        lock.lock()
-        activeTasks[key] = task
-        lock.unlock()
-        task.resume()
-        return true
+        // Determine whether this resource is an HLS playlist.
+        // IMPORTANT: YouTube segment URLs embed "/playlist/index.m3u8/" in their path
+        // (e.g. ".../playlist/index.m3u8/govp/.../file/seg.ts"), so a simple path.contains
+        // check erroneously treats segments as playlists — corrupting binary TS data.
+        // We use the MIME type first, then fall back to whether the path *ends* with m3u8
+        // (last path component), which correctly excludes segment URLs.
+        let mimeTypeLower = (httpResp.value(forHTTPHeaderField: "Content-Type") ?? "").lowercased()
+        let isPlaylist =
+            mimeTypeLower.contains("mpegurl")
+            || realURL.pathExtension.lowercased() == "m3u8"
+            || realURL.lastPathComponent.lowercased() == "index.m3u8"
+        proxyLog.notice(
+            "[HLSProxy] Content-Type=\(httpResp.value(forHTTPHeaderField: "Content-Type") ?? "nil") isPlaylist=\(isPlaylist)"
+        )
+        let text = isPlaylist ? String(data: data, encoding: .utf8) : nil
+
+        // Master: drop variants whose playlist doesn't load before AVPlayer picks one.
+        if let text, text.contains("#EXT-X-STREAM-INF") {
+            Task {
+                let checked = await self.removingUnavailablePlaylists(from: text, baseURL: realURL)
+                self.finish(
+                    loadingRequest, data: Data(checked.utf8), realURL: realURL,
+                    isPlaylist: true, mimeTypeLower: mimeTypeLower)
+            }
+            return
+        }
+
+        // JS-player-client HLS: solve the scrambled n in media playlists (segment lists).
+        if let text, self.solvesNChallenges, !text.contains("#EXT-X-MEDIA:") {
+            let pending = StreamURLRewriter.hlsNChallenges(in: text)
+            if !pending.isEmpty {
+                Task {
+                    let solved = await YouTubeJSSolver.shared.solve(n: pending, sig: []).n
+                    proxyLog.notice("[HLSProxy] solved \(solved.count)/\(pending.count) segment n value(s)")
+                    let patched = StreamURLRewriter.replacingHLSN(in: text, solutions: solved)
+                    self.finish(
+                        loadingRequest, data: Data(patched.utf8), realURL: realURL,
+                        isPlaylist: true, mimeTypeLower: mimeTypeLower)
+                }
+                return
+            }
+        }
+        self.finish(
+            loadingRequest, data: data, realURL: realURL, isPlaylist: isPlaylist, mimeTypeLower: mimeTypeLower)
+    }
+
+    // MARK: Master check
+
+    private enum PlaylistCheck: Sendable {
+        case available, unavailable, unknown
+    }
+
+    /// Fetches every media playlist the (filtered) master references and removes the ones
+    /// that don't load. Loaded playlists are kept to answer AVPlayer's own request for them.
+    private func removingUnavailablePlaylists(from multivariant: String, baseURL: URL) async -> String {
+        // Only what survives the codec/height filter can be picked, so only that is checked.
+        var candidates = multivariant
+        if let maximumVideoHeight, let requiredVideoCodec {
+            candidates = filterHLSMasterManifest(
+                multivariant, maximumHeight: maximumVideoHeight, requiredVideoCodec: requiredVideoCodec)
+        }
+        let uris = Array(Set(hlsMultivariantPlaylistURIs(candidates)))
+        // A huge unfiltered master (every codec and language) isn't worth the requests.
+        guard !uris.isEmpty, uris.count <= Self.maxPlaylistsChecked else { return multivariant }
+
+        let results = await withTaskGroup(of: (String, PlaylistCheck).self) { group in
+            for uri in uris {
+                guard let url = URL(string: uri, relativeTo: baseURL)?.absoluteURL else { continue }
+                group.addTask { (uri, await self.check(url)) }
+            }
+            var results: [String: PlaylistCheck] = [:]
+            for await (uri, check) in group { results[uri] = check }
+            return results
+        }
+        let unavailable = Set(results.filter { $0.value == .unavailable }.keys)
+        guard !unavailable.isEmpty else { return multivariant }
+        // Nothing loads: leave the master alone and let the caller's fallbacks take over.
+        guard unavailable.count < uris.count else { return multivariant }
+        proxyLog.notice("[HLSProxy] dropped \(unavailable.count)/\(uris.count) playlist(s) that don't load")
+        return removingHLSPlaylists(unavailable, from: multivariant)
+    }
+
+    private static let maxPlaylistsChecked = 24
+
+    /// Loads one media playlist. Network errors are `unknown` (kept: may be transient).
+    private func check(_ url: URL) async -> PlaylistCheck {
+        var request = makeRequest(for: url)
+        request.timeoutInterval = 6
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+            let http = response as? HTTPURLResponse
+        else { return .unknown }
+        let head = String(bytes: data.prefix(64), encoding: .utf8) ?? ""
+        let isPlaylist = head.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("#EXTM3U")
+        guard http.statusCode < 400, isPlaylist else {
+            proxyLog.notice("[HLSProxy] playlist check: HTTP \(http.statusCode) — \(url.absoluteString.prefix(160))")
+            return .unavailable
+        }
+        lock.withLock { prefetched[url.absoluteString] = (data, http) }
+        return .available
+    }
+
+    private func takePrefetched(_ url: URL) -> (data: Data, response: HTTPURLResponse)? {
+        lock.withLock { prefetched.removeValue(forKey: url.absoluteString) }
     }
 
     /// Rewrites playlists (proxy scheme, filters, pot=) and answers the loading request.
