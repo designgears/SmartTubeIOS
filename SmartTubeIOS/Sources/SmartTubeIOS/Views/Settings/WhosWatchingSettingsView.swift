@@ -21,7 +21,7 @@ struct WhosWatchingSettingsView: View {
                             }
                         }
                     }
-                    .accessibilityIdentifier("settings.whosWatching.\(profile.id)")
+                    .accessibilityIdentifier(AccessibilityID.Settings.whosWatchingProfile(profile.id))
                 }
             } header: {
                 Text("Show on Who's Watching")
