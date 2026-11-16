@@ -5,14 +5,15 @@ import UIKit
 
 // MARK: - SponsorBlock segments on the scrubber
 
-/// SponsorBlock segments drawn over the native scrubber's track. It lives inside
+/// A thin strip of SponsorBlock segments just above the native scrubber. It lives inside
 /// AVPlayerViewController's own transport bar (see `attach(toTransportBarIn:)`) and fades
 /// with the bar's track, in the same animation — nothing has to guess when the bar is up.
 /// AVKit has no public API for annotating the bar (interstitial time ranges are treated as
 /// ad breaks: they collapse the timeline and restart the clock).
 final class TVSponsorSegmentStrip: UIView {
-    /// The track's own thickness, so segments cover it exactly.
-    private static let height: CGFloat = 13
+    private static let height: CGFloat = 6
+    /// Space between the strip and the track below it.
+    private static let gap: CGFloat = 6
 
     private var segments: [SponsorSegment] = []
     private var duration: TimeInterval = 0
@@ -45,9 +46,7 @@ final class TVSponsorSegmentStrip: UIView {
         }
         if superview !== bar { bar.addSubview(self) }
         if fadingTrack !== track { follow(track) }
-        let height = min(Self.height, bar.bounds.height)
-        let target = CGRect(
-            x: 0, y: (bar.bounds.height - height) / 2, width: bar.bounds.width, height: height)
+        let target = CGRect(x: 0, y: -(Self.height + Self.gap), width: bar.bounds.width, height: Self.height)
         if frame != target {
             frame = target
             drawSegments()
@@ -67,7 +66,8 @@ final class TVSponsorSegmentStrip: UIView {
         }
     }
 
-    /// AVKit's transport bar (`AVNowPlayingTransportBar` on tvOS 26), which spans the track.
+    /// AVKit's transport bar (`AVNowPlayingTransportBar` on tvOS 26): it spans the track and
+    /// doesn't clip, so the strip can sit above the track.
     private static func transportBar(containing track: UIView) -> UIView? {
         var view = track.superview
         while let current = view {
