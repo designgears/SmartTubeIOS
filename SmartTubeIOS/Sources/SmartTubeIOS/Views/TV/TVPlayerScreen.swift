@@ -263,6 +263,9 @@ struct TVNativePlayer: UIViewControllerRepresentable {
         private var pausedStartFallback: Task<Void, Never>?
         private var artworkTask: Task<Void, Never>?
         private var panelsShowChapters: Bool?
+        /// What Auto is playing ("1080p"), from the decoded picture size; shown on Auto.
+        private var autoQuality: String?
+        private var presentationObservation: NSKeyValueObservation?
         /// SponsorBlock segments, inside the native transport bar (TVTransportBarTracking.swift).
         let segmentStrip = TVSponsorSegmentStrip()
         /// AVKit's LIVE tags in the app's live color (TVLiveBadgeTint.swift).
@@ -285,6 +288,7 @@ struct TVNativePlayer: UIViewControllerRepresentable {
                 }
             }
             installSegmentStrip(on: pvc.view)
+            presentationObservation = observePictureSize(of: vm.player)
             readyObservation = pvc.observe(\.isReadyForDisplay, options: [.initial, .new]) { [weak self] _, _ in
                 Task { @MainActor in self?.refreshVideoOnScreen() }
             }
@@ -352,7 +356,23 @@ struct TVNativePlayer: UIViewControllerRepresentable {
             }
         }
 
+        private func observePictureSize(of player: AVPlayer) -> NSKeyValueObservation {
+            player.observe(\.currentItem?.presentationSize, options: [.initial, .new]) { [weak self] player, _ in
+                let size = player.currentItem?.presentationSize ?? .zero
+                Task { @MainActor in self?.showAutoQuality(qualityName(width: size.width, height: size.height)) }
+            }
+        }
+
+        /// Retitles Auto when the picture Auto chose changes (ABR switching quality).
+        private func showAutoQuality(_ name: String?) {
+            guard name != autoQuality else { return }
+            autoQuality = name
+            guard let pvc, let state = lastState, state.selectedFormatID == nil else { return }
+            pvc.transportBarCustomMenuItems = menus(for: state)
+        }
+
         func detach() {
+            presentationObservation?.invalidate()
             itemObservation?.invalidate()
             itemObservation = nil
             readyObservation?.invalidate()
@@ -420,17 +440,13 @@ struct TVNativePlayer: UIViewControllerRepresentable {
 
         // MARK: Transport-bar menus
 
-        private func menus(for state: TVPlayerMenuState) -> [UIMenuElement] {
-            var items: [UIMenuElement] = []
-
-            items.append(
-                UIAction(
-                    title: state.isLiked ? "Liked" : "Like",
-                    image: UIImage(systemName: state.isLiked ? AppSymbol.thumbsUpFill : AppSymbol.thumbsUp)
-                ) { [weak self] _ in self?.actions?.like() })
-
+        /// Auto (with what it's playing) and each distinct quality, best first.
+        private func qualityMenu(for state: TVPlayerMenuState) -> UIMenu {
             var qualityChildren: [UIMenuElement] = [
-                UIAction(title: "Auto", state: state.selectedFormatID == nil ? .on : .off) { [weak self] _ in
+                UIAction(
+                    title: state.selectedFormatID == nil ? autoQuality.map { "Auto (\($0))" } ?? "Auto" : "Auto",
+                    state: state.selectedFormatID == nil ? .on : .off
+                ) { [weak self] _ in
                     self?.actions?.selectFormat(nil)
                 }
             ]
@@ -445,10 +461,21 @@ struct TVNativePlayer: UIViewControllerRepresentable {
                 action.subtitle = format.codecShortLabel
                 qualityChildren.append(action)
             }
+            return UIMenu(
+                title: "Quality", image: UIImage(systemName: AppSymbol.quality),
+                options: .singleSelection, children: qualityChildren)
+        }
+
+        private func menus(for state: TVPlayerMenuState) -> [UIMenuElement] {
+            var items: [UIMenuElement] = []
+
             items.append(
-                UIMenu(
-                    title: "Quality", image: UIImage(systemName: AppSymbol.quality),
-                    options: .singleSelection, children: qualityChildren))
+                UIAction(
+                    title: state.isLiked ? "Liked" : "Like",
+                    image: UIImage(systemName: state.isLiked ? AppSymbol.thumbsUpFill : AppSymbol.thumbsUp)
+                ) { [weak self] _ in self?.actions?.like() })
+
+            items.append(qualityMenu(for: state))
 
             if !state.captions.isEmpty {
                 var children: [UIMenuElement] = [

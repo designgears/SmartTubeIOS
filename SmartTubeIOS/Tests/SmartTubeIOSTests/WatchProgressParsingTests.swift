@@ -118,3 +118,19 @@ struct LiveVariantTests {
         #expect(consistentLiveVariants(video) == video)
     }
 }
+
+@Suite("Quality label for a picture size")
+struct QualityLabelTests {
+    @Test(arguments: [
+        (1920.0, 1080.0, "1080p"), (1920, 800, "1080p"), (1080, 1920, "1080p"), (1280, 720, "720p"),
+        (3840, 2160, "2160p"), (854, 480, "480p"), (640, 360, "360p"), (426, 240, "240p"), (256, 144, "144p"),
+        (1916, 1076, "1080p"),
+    ])
+    func names(width: Double, height: Double, expected: String) {
+        #expect(qualityName(width: width, height: height) == expected)
+    }
+
+    @Test func noSizeNoLabel() {
+        #expect(qualityName(width: 0, height: 0) == nil)
+    }
+}
