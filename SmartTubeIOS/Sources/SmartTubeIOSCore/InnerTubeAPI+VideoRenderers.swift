@@ -787,14 +787,15 @@ extension InnerTubeAPI {
         let metaContentVM = (lockupMeta?["metadata"] as? [String: Any])?["contentMetadataViewModel"] as? [String: Any]
         let metaRows = metaContentVM?["metadataRows"] as? [[String: Any]] ?? []
 
-        let channelTitle: String = {
-            guard let firstRow = metaRows.first,
-                let parts = firstRow["metadataParts"] as? [[String: Any]],
-                let firstPart = parts.first,
-                let text = firstPart["text"] as? [String: Any]
-            else { return "" }
-            return text["content"] as? String ?? extractText(text) ?? ""
-        }()
+        // Channel, views and age, read by what each part is: rows differ by surface (see
+        // LockupMetadata) — channel pages have no channel row, search cards put all on one.
+        let rowTexts: [[String]] = metaRows.map { row in
+            (row["metadataParts"] as? [[String: Any]] ?? []).compactMap { part in
+                (part["text"] as? [String: Any]).flatMap { $0["content"] as? String ?? extractText($0) }
+            }
+        }
+        let metadata = LockupMetadata(rows: rowTexts)
+        let channelTitle = metadata.channelTitle ?? ""
 
         // channelId: watchEndpoint.channelId (primary) or reelWatchEndpoint.channelId or
         // lockupMetadataViewModel.metadata.contentMetadataViewModel.metadataRows[].metadataParts[]
@@ -821,10 +822,19 @@ extension InnerTubeAPI {
                 return nil
             }()
 
-        // thumbnail: contentImage.thumbnailViewModel.image.thumbnails
+        // thumbnail: contentImage.thumbnailViewModel.image.{thumbnails|sources} (search cards use sources)
         let thumbVM = (lockup["contentImage"] as? [String: Any])?["thumbnailViewModel"] as? [String: Any]
-        let thumbnails = (thumbVM?["image"] as? [String: Any])?["thumbnails"] as? [[String: Any]]
+        let image = thumbVM?["image"] as? [String: Any]
+        let thumbnails = (image?["thumbnails"] ?? image?["sources"]) as? [[String: Any]]
         let thumbURL = thumbnails?.last.flatMap { $0["url"] as? String }.flatMap { URL(string: $0) }
+
+        // Length or LIVE: the badge on the thumbnail ("15:03").
+        let badgeTexts: [String] = ((thumbVM?["overlays"] as? [[String: Any]]) ?? []).flatMap { overlay in
+            let badges = (overlay["thumbnailBottomOverlayViewModel"] as? [String: Any])?["badges"] as? [[String: Any]]
+            return (badges ?? []).compactMap { ($0["thumbnailBadgeViewModel"] as? [String: Any])?["text"] as? String }
+        }
+        let duration = badgeTexts.lazy.compactMap { self.parseDuration($0) }.first
+        let isLive = metadata.isLive || badgeTexts.contains { $0.uppercased() == "LIVE" }
 
         // isShort: only one signal currently (reelWatchEndpoint) — unlike parseVideoRenderer's
         // four signals. GitHub #41 ("Hide Shorts" still leaking through in Home/Subscriptions,
@@ -857,38 +867,13 @@ extension InnerTubeAPI {
             }
         }
 
-        let publishedAt: Date? = {
-            for row in metaRows.dropFirst() {
-                guard let parts = row["metadataParts"] as? [[String: Any]] else { continue }
-                for part in parts {
-                    guard let text = part["text"] as? [String: Any],
-                        let str = text["content"] as? String ?? extractText(text)
-                    else { continue }
-                    if let date = parseRelativeDate(str) { return date }
-                }
-            }
-            return nil
-        }()
-
         return Video(
             id: videoId, title: title, channelTitle: channelTitle, channelId: channelId,
-            thumbnailURL: thumbURL, duration: nil,
-            viewCount: {
-                // BUG-011 fix: extract viewCount from contentMetadataViewModel metadataRows.
-                // Row index 1 (second row) often contains "N views" or compact count.
-                for row in metaRows.dropFirst() {
-                    guard let parts = row["metadataParts"] as? [[String: Any]] else { continue }
-                    for part in parts {
-                        guard let text = part["text"] as? [String: Any],
-                            let str = text["content"] as? String ?? extractText(text)
-                        else { continue }
-                        if let count = extractNumber(str) { return count }
-                    }
-                }
-                return nil
-            }(),
-            publishedAt: publishedAt,
-            isLive: false, isShort: isShort, badges: []
+            thumbnailURL: thumbURL, duration: duration,
+            viewCount: metadata.viewCount,
+            publishedAt: metadata.age?.date(),
+            publishedTimeText: metadata.age?.text,
+            isLive: isLive, isShort: isShort, badges: []
         )
     }
 
