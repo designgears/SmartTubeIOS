@@ -113,7 +113,7 @@ public struct LibraryView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
-            .background(.ultraThinMaterial)
+            .appGlass(.ultraThinMaterial)
             .focusSection()
             .defaultFocus($focusedSection, selectedSection)
             .accessibilityElement(children: .contain)

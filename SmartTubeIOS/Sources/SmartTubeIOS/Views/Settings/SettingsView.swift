@@ -45,6 +45,9 @@ public struct SettingsView: View {
             playerSection
             generalSection
             uiSection
+            #if os(iOS)
+            GlassSettingsSection()
+            #endif
             sponsorBlockSection
             deArrowSection
             dislikesSection
@@ -464,12 +467,6 @@ public struct SettingsView: View {
                 .accessibilityIdentifier("settings.hideWatchedThresholdStepper")
                 #endif
             }
-            #if os(iOS)
-            if #available(iOS 26.0, *) {
-                Toggle("Disable Liquid Glass", isOn: $store.settings.disableLiquidGlass)
-                    .accessibilityIdentifier("settings.disableLiquidGlassToggle")
-            }
-            #endif
             #if !os(tvOS)
             // tvOS uses a fixed sidebar, so section visibility doesn't apply there.
             NavigationLink("Visible Sections") {

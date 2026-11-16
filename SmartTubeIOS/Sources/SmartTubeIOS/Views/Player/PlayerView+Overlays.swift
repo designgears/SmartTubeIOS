@@ -117,7 +117,7 @@ extension PlayerView {
                     )
             }
             .accessibilityIdentifier("player.moreMenu.scrollView")
-            .background(.regularMaterial)
+            .appGlass(.regularMaterial)
             .clipShape(RoundedRectangle(cornerRadius: 16))
             .onPreferenceChange(MoreMenuContentHeightKey.self) { moreMenuContentHeight = $0 }
             // Height = natural content height capped at moreMenuMaxHeight.
@@ -275,7 +275,7 @@ extension PlayerView {
                 }
                 .frame(maxHeight: 400)
             }
-            .background(.regularMaterial)
+            .appGlass(.regularMaterial)
             .clipShape(RoundedRectangle(cornerRadius: 16))
             #if os(tvOS)
             .focusScope(descriptionOverlayNamespace)

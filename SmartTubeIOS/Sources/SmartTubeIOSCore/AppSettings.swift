@@ -30,6 +30,17 @@ public struct AppSettings: Codable {
     public var controlsHideTimeout: Int
 
     /// Whether the video should fill the screen (cropping sides) or fit within bounds.
+    public enum GlassStyle: String, Codable, CaseIterable, Sendable {
+        /// As designed: light materials that let the video and content show through.
+        case standard
+        /// A heavier blur; little shows through.
+        case frosted
+        /// Opaque.
+        case solid
+
+        public var displayName: String { rawValue.capitalized }
+    }
+
     public enum VideoGravityMode: String, Codable, CaseIterable, Sendable {
         case fit = "fit"  // resizeAspect — letterbox/pillarbox
         case fill = "fill"  // resizeAspectFill — crops to fill
@@ -56,15 +67,14 @@ public struct AppSettings: Codable {
     public var hideWatchedVideos: Bool
     /// 0.0...1.0 — how far into a video counts as "watched" for `hideWatchedVideos`.
     public var hideWatchedThreshold: Double
-    /// #107/#143: opts the app out of iOS 26's Liquid Glass tab bar. Apple's documented
-    /// mechanism (`UIDesignRequiresCompatibility` in Info.plist) is build-time only and
-    /// can't back a live, per-user toggle — see `TabBarLiquidGlassConfigurator`, which
-    /// instead restyles the actual on-screen `UITabBar` instance directly. Takes effect
-    /// immediately, no restart needed.
-    public var disableLiquidGlass: Bool
+    /// How the app's own translucent surfaces look (player controls, mini player, panels).
+    /// iOS's Liquid Glass on system chrome (tab/navigation bars, sheets, menus) can't be
+    /// turned off by an app — Xcode 27 removed `UIDesignRequiresCompatibility` — so those
+    /// follow iOS's Liquid Glass and Reduce Transparency settings instead.
+    public var glassStyle: GlassStyle
     /// #92: when `true`, local diagnostics (`DiagnosticsLogger` session log + reports) are
-    /// not written. Nothing is ever sent off-device. Read once at process launch like
-    /// `disableLiquidGlass` above — takes effect on the *next* launch, not live.
+    /// not written. Nothing is ever sent off-device. Read once at process launch — takes
+    /// effect on the *next* launch, not live.
     public var disableAnalytics: Bool
     /// #126: SHA256 hex digest of the Settings-screen parental-control PIN (see
     /// `SettingsPINHasher`). `nil` means no PIN is configured and Settings behaves as
@@ -286,7 +296,7 @@ public struct AppSettings: Codable {
         highResThumbnails = false
         hideWatchedVideos = false
         hideWatchedThreshold = 0.9
-        disableLiquidGlass = false
+        glassStyle = .standard
         disableAnalytics = false
         settingsPINHash = nil
         hideShorts = false
@@ -379,7 +389,7 @@ extension AppSettings {
         case highResThumbnails
         case hideWatchedVideos
         case hideWatchedThreshold
-        case disableLiquidGlass
+        case glassStyle
         case disableAnalytics
         case settingsPINHash
         case hideShorts
@@ -410,6 +420,18 @@ extension AppSettings {
         case useTOSPlayerOnMac
     }
 
+    /// Settings saved before `glassStyle` had a "Disable Liquid Glass" switch: on means Solid.
+    private enum LegacyKeys: String, CodingKey {
+        case disableLiquidGlass
+    }
+
+    private static func legacyGlassStyle(_ decoder: Decoder) -> GlassStyle? {
+        guard let legacy = try? decoder.container(keyedBy: LegacyKeys.self),
+            (try? legacy.decode(Bool.self, forKey: .disableLiquidGlass)) == true
+        else { return nil }
+        return .solid
+    }
+
     public init(from decoder: Decoder) throws {
         let d = AppSettings()  // defaults for any missing/mismatched field
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -438,7 +460,8 @@ extension AppSettings {
         hideWatchedVideos = c.safeDecode(Bool.self, forKey: .hideWatchedVideos, default: d.hideWatchedVideos)
         hideWatchedThreshold = c.safeDecode(
             Double.self, forKey: .hideWatchedThreshold, default: d.hideWatchedThreshold)
-        disableLiquidGlass = c.safeDecode(Bool.self, forKey: .disableLiquidGlass, default: d.disableLiquidGlass)
+        glassStyle = c.safeDecode(
+            GlassStyle.self, forKey: .glassStyle, default: Self.legacyGlassStyle(decoder) ?? d.glassStyle)
         disableAnalytics = c.safeDecode(Bool.self, forKey: .disableAnalytics, default: d.disableAnalytics)
         settingsPINHash = c.safeDecode(String?.self, forKey: .settingsPINHash, default: d.settingsPINHash)
         hideShorts = c.safeDecode(Bool.self, forKey: .hideShorts, default: d.hideShorts)

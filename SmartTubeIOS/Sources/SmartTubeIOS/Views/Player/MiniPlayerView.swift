@@ -62,7 +62,7 @@ struct MiniPlayerView: View {
         .padding(.leading, 4)
         .padding(.trailing, 4)
         .frame(height: 62)
-        .background(.regularMaterial)
+        .appGlass(.regularMaterial)
         .contentShape(Rectangle())
         .onTapGesture { playerState.expand() }
         // Ensure child buttons remain individually discoverable by XCTest even though

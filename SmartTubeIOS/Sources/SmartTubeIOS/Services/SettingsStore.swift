@@ -85,10 +85,10 @@ public final class SettingsStore {
             (saved as? Data).flatMap { try? JSONDecoder().decode(AppSettings.self, from: $0) }
             ?? Self.startingSettings(from: settings)
         // Device-level, not per account: the parental PIN (switching accounts must not get
-        // past it) and switches that are only read at launch.
+        // past it), switches that are only read at launch, and how the app's glass looks.
         next.settingsPINHash = settings.settingsPINHash
         next.disableAnalytics = settings.disableAnalytics
-        next.disableLiquidGlass = settings.disableLiquidGlass
+        next.glassStyle = settings.glassStyle
         next.poTokenServiceURL = settings.poTokenServiceURL
         settings = next
         settingsLog.notice("settings switched to the active account (new=\(isNewAccount, privacy: .public))")

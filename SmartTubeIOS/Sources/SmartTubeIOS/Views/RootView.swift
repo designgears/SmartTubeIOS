@@ -65,7 +65,11 @@ public struct RootView: View {
         }
         #endif
         .environment(\.isLandscapeLayout, isLandscapeLayout)
-        .onGeometryChange(for: Bool.self) { $0.size.width > $0.size.height } action: { isLandscapeLayout = $0 }
+        .onGeometryChange(for: Bool.self) {
+            $0.size.width > $0.size.height
+        } action: {
+            isLandscapeLayout = $0
+        }
         .tint(store.settings.accentColor.color)
         .preferredColorScheme(store.settings.themeName.colorScheme)
         #if !os(tvOS) && ENABLE_DOWNLOADS
@@ -233,9 +237,6 @@ struct MainTabView: View {
             }
         }
         .onPreferenceChange(TabBarBottomInsetKey.self) { tabBarBottomInset = $0 }
-        #if os(iOS)
-        .background(TabBarLiquidGlassConfigurator(disableLiquidGlass: store.settings.disableLiquidGlass))
-        #endif
         .environment(searchVM)
         .onReceive(NotificationCenter.default.publisher(for: .navigateToSearch)) { _ in
             selectedTab = .search
@@ -319,7 +320,8 @@ struct MainTabView: View {
                 // work there. The standard player plays with the app's own sign-in, so
                 // this one error still falls back to it on iOS.
                 if tosState.vm?.playerError == .signInRequired {
-                    rootLog.notice("[RootView] TOS sign-in required for videoId=\(video.id) — opening the standard player")
+                    rootLog.notice(
+                        "[RootView] TOS sign-in required for videoId=\(video.id) — opening the standard player")
                     tosState.markFallback(videoId: video.id)
                     playerRouter.open(video: video, api: api)
                     return

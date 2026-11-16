@@ -687,7 +687,7 @@ public struct TOSPlayerView: View {
                 .foregroundStyle(.white)
                 .padding(.horizontal, 11)
                 .padding(.vertical, 7)
-                .background(.ultraThinMaterial, in: Capsule())
+                .appGlass(.ultraThinMaterial, in: Capsule())
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
@@ -801,7 +801,7 @@ public struct TOSPlayerView: View {
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(.white)
                 .padding(9)
-                .background(.ultraThinMaterial, in: Circle())
+                .appGlass(.ultraThinMaterial, in: Circle())
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
@@ -864,7 +864,7 @@ public struct TOSPlayerView: View {
                         .foregroundStyle(.white)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
-                        .background(.thinMaterial, in: Capsule())
+                        .appGlass(.thinMaterial, in: Capsule())
                 }
                 .buttonStyle(.plain)
             }
@@ -893,7 +893,7 @@ public struct TOSPlayerView: View {
                         .foregroundStyle(.white)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
-                        .background(.thinMaterial, in: Capsule())
+                        .appGlass(.thinMaterial, in: Capsule())
                 }
                 .buttonStyle(.plain)
             }
@@ -914,7 +914,7 @@ public struct TOSPlayerView: View {
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.white)
                 .padding(8)
-                .background(.thinMaterial, in: Circle())
+                .appGlass(.thinMaterial, in: Circle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(Text("Report Incorrect Segment", bundle: .module))

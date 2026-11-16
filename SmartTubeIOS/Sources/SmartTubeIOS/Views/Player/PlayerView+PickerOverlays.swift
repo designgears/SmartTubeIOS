@@ -115,7 +115,7 @@ extension PlayerView {
                 #endif
             }
             .frame(maxWidth: moreMenuPortraitWidth)
-            .background(.regularMaterial)
+            .appGlass(.regularMaterial)
             .clipShape(RoundedRectangle(cornerRadius: 16))
             .accessibilityIdentifier("player.qualityPicker")
             .task {
@@ -193,7 +193,7 @@ extension PlayerView {
                 #endif
             }
             .frame(maxWidth: moreMenuPortraitWidth)
-            .background(.regularMaterial)
+            .appGlass(.regularMaterial)
             .clipShape(RoundedRectangle(cornerRadius: 16))
             .accessibilityIdentifier("player.speedPicker")
             #if os(tvOS)
@@ -279,7 +279,7 @@ extension PlayerView {
                 .frame(maxHeight: 320)
             }
             .frame(maxWidth: moreMenuPortraitWidth)
-            .background(.regularMaterial)
+            .appGlass(.regularMaterial)
             .clipShape(RoundedRectangle(cornerRadius: 16))
             .accessibilityIdentifier("player.sleepTimerPicker")
             #if os(tvOS)
@@ -379,7 +379,7 @@ extension PlayerView {
                 #endif
             }
             .frame(maxWidth: moreMenuPortraitWidth)
-            .background(.regularMaterial)
+            .appGlass(.regularMaterial)
             .clipShape(RoundedRectangle(cornerRadius: 16))
             .accessibilityIdentifier("player.captionPicker")
             #if os(tvOS)
@@ -476,7 +476,7 @@ extension PlayerView {
                 #endif
             }
             .frame(maxWidth: moreMenuPortraitWidth)
-            .background(.regularMaterial)
+            .appGlass(.regularMaterial)
             .clipShape(RoundedRectangle(cornerRadius: 16))
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("player.audioTrackPicker")

@@ -30,13 +30,9 @@ struct SmartTubeApp: App {
         #endif
 
         #if os(iOS)
-        // #107: UIKit reads UIDesignRequiresCompatibility once at process launch to
-        // decide whether to render iOS 26's Liquid Glass tab bar or the pre-26 style —
-        // there's no live/runtime API to flip it, so this can only take effect on the
-        // *next* launch after the user toggles it in Settings (see SettingsView's
-        // "Restart the app for this to take effect" note next to the toggle).
-        UserDefaults.standard.set(
-            settingsStore.settings.disableLiquidGlass, forKey: "UIDesignRequiresCompatibility")
+        // Left behind by the old "Disable Liquid Glass" switch, which UIKit never read
+        // from UserDefaults (only from Info.plist, and Xcode 27 dropped it there too).
+        UserDefaults.standard.removeObject(forKey: "UIDesignRequiresCompatibility")
         #endif
     }
 
@@ -48,25 +44,25 @@ struct SmartTubeApp: App {
                 .environment(settingsStore)
                 .environment(\.innerTubeAPI, api)
                 #if ENABLE_DOWNLOADS
-                .environment(cardDownloadService)
+            .environment(cardDownloadService)
                 #endif
                 #if ENABLE_DOWNLOADS
-                .environment(DownloadStore.shared)
-                #endif
-                .onChange(of: authService.accessToken, initial: true) { _, newToken in
-                    Task {
-                        await api.setAuthToken(newToken)
-                        await browseViewModel.updateAuthToken(newToken)
-                    }
+            .environment(DownloadStore.shared)
+            #endif
+            .onChange(of: authService.accessToken, initial: true) { _, newToken in
+                Task {
+                    await api.setAuthToken(newToken)
+                    await browseViewModel.updateAuthToken(newToken)
                 }
-                .onChange(of: settingsStore.settings.enabledSections) { _, newSections in
-                    browseViewModel.configureSections(newSections)
-                }
-                .task {
-                    // Sync enablement state on launch, then start the iCloud KV listener.
-                    iCloudSyncManager.shared.syncEnabled = settingsStore.settings.iCloudSyncEnabled
-                    await iCloudSyncManager.shared.start()
-                }
+            }
+            .onChange(of: settingsStore.settings.enabledSections) { _, newSections in
+                browseViewModel.configureSections(newSections)
+            }
+            .task {
+                // Sync enablement state on launch, then start the iCloud KV listener.
+                iCloudSyncManager.shared.syncEnabled = settingsStore.settings.iCloudSyncEnabled
+                await iCloudSyncManager.shared.start()
+            }
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
