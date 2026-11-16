@@ -203,7 +203,12 @@ public final class PlaybackViewModel {
     public var likeStatus: LikeStatus { likeDislike.likeStatus }
     public func like() { likeDislike.like(videoId: currentVideo?.id) }
     /// The watch page's exact count, else the player response's, else the card's.
-    public var viewCount: Int? { videoDetails?.viewCount ?? playerInfo?.video.viewCount ?? currentVideo?.viewCount }
+    /// The first source that has a count; a zero is a placeholder some responses send, never
+    /// better than the count the video's card already showed.
+    public var viewCount: Int? {
+        [videoDetails?.viewCount, playerInfo?.video.viewCount, currentVideo?.viewCount]
+            .lazy.compactMap { $0 }.first { $0 > 0 }
+    }
     /// YouTube's exact count when the watch page gave one, else Return YouTube Dislike's.
     public var likeCount: Int? { videoDetails?.likeCount ?? votes?.likes }
     /// "18K".

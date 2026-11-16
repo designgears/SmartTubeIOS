@@ -79,6 +79,25 @@ struct VideoDetailsTests {
         #expect(details.channelAvatarURL == URL(string: "https://yt3.ggpht.com/a=s176"))
     }
 
+    /// Real `/next` responses often carry `originalViewCount: "0"` next to the real count.
+    @Test func zeroOriginalViewCountFallsBackToTheText() throws {
+        let renderer = { (original: String, text: String) -> [String: Any] in
+            [
+                "videoPrimaryInfoRenderer": [
+                    "viewCount": [
+                        "videoViewCountRenderer": [
+                            "viewCount": ["simpleText": text], "originalViewCount": original,
+                        ]
+                    ]
+                ]
+            ]
+        }
+        let placeholder = try #require(VideoDetails.parse(next: renderer("0", "177,212 views")))
+        #expect(placeholder.viewCount == 177_212)
+        let noCount = try #require(VideoDetails.parse(next: renderer("0", "No views")))
+        #expect(noCount.viewCount == nil)
+    }
+
     @Test func noWatchPageRenderersMeansNoDetails() {
         #expect(VideoDetails.parse(next: ["contents": [:]]) == nil)
     }

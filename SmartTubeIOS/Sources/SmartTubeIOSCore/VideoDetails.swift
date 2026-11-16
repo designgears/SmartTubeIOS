@@ -58,9 +58,11 @@ public struct VideoDetails: Sendable, Codable, Equatable {
             details.relativeDateText = text(primary["relativeDateText"])
             let viewRenderer =
                 (primary["viewCount"] as? [String: Any])?["videoViewCountRenderer"] as? [String: Any]
+            // `originalViewCount` is "0" for many videos while the text has the real count
+            // ("177,212 views"), so the text comes first and a zero is never trusted.
             details.viewCount =
-                (viewRenderer?["originalViewCount"] as? String).flatMap { Int($0) }
-                ?? text(viewRenderer?["viewCount"]).flatMap { leadingNumber(in: $0) }
+                text(viewRenderer?["viewCount"]).flatMap { leadingNumber(in: $0) }.flatMap { $0 > 0 ? $0 : nil }
+                ?? (viewRenderer?["originalViewCount"] as? String).flatMap { Int($0) }.flatMap { $0 > 0 ? $0 : nil }
             details.likeCount = likeCount(in: primary)
         }
         if let owner = (secondary?["owner"] as? [String: Any])?["videoOwnerRenderer"] as? [String: Any] {
