@@ -51,6 +51,13 @@ struct TVHomeView: View {
                     .frame(height: 640)
                 }
 
+                // Subscribed channels streaming right now; the shelf exists only while one is.
+                if !liveNow.isEmpty {
+                    TVShelf(title: "Live Now", items: liveNow, prefetchWidth: TVLayout.cardWidth) { video in
+                        TVVideoCard(video: video) { navigator.play(video) }
+                    }
+                }
+
                 if !continueWatching.isEmpty {
                     TVShelf(
                         title: "Continue Watching", items: continueWatching, prefetchWidth: TVLayout.cardWidth
@@ -181,10 +188,20 @@ struct TVHomeView: View {
         homeVM?.sections.first { $0.section.type == .subscriptions }
     }
 
+    /// What the Live Now shelf shows: the subscription feed's live streams (never hidden as
+    /// watched — they're happening now).
+    private var liveNow: [Video] {
+        guard isSignedIn else { return [] }
+        let subs = subscriptionsSection?.videos ?? []
+        return subs.filter { $0.isLive && !($0.isShort && hideShorts) }.uniquedByID()
+    }
+
     private var subscriptionVideos: [Video] {
         guard isSignedIn else { return [] }
         let subs = subscriptionsSection?.videos ?? []
-        return subs.filter { !$0.isShort }.uniquedByID().hidingWatched(in: .subscriptions, settings: store.settings)
+        // Live streams are on their own shelf.
+        return subs.filter { !$0.isShort && !$0.isLive }.uniquedByID()
+            .hidingWatched(in: .subscriptions, settings: store.settings)
     }
 
     /// Videos the Recommended feed has fetched, before filtering — its shelf's page key.
