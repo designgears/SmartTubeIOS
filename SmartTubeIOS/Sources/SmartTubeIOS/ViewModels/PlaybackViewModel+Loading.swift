@@ -156,6 +156,8 @@ extension PlaybackViewModel {
         seekDebounceTask?.cancel()
         isScrubbing = false
         chapters = []
+        videoDetails = nil
+        votes = nil
         captionsManager.reset()
         audioManager.reset()
         endCards = []
@@ -1426,6 +1428,7 @@ extension PlaybackViewModel {
                 hasNext = await CurrentQueueStore.shared.videoAt(index: idx + 1) != nil
             }
             if let status = nextInfo?.likeStatus { likeDislike.setLikeStatus(status) }
+            applyWatchPageDetails(nextInfo?.details, for: video)
             if let ch = nextInfo?.chapters, !ch.isEmpty {
                 chapters = ch
                 playerLog.notice("[chapters] applied \(ch.count) chapters for \(video.id)")

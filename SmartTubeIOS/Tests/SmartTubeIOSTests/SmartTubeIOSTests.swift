@@ -30,7 +30,7 @@ struct VideoModelTests {
 
     @Test func formattedViewCountMillions() {
         let video = Video(id: "v", title: "T", channelTitle: "C", viewCount: 2_000_000)
-        #expect(video.formattedViewCount == "2.0M views")
+        #expect(video.formattedViewCount == "2M views")
     }
 
     @Test func highQualityThumbnailURL() {

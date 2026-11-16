@@ -133,6 +133,10 @@ public final class PlaybackViewModel {
     public var toastMessage: String? = nil
     public internal(set) var relatedVideos: [Video] = []
     public internal(set) var chapters: [Chapter] = []
+    /// Publish date, exact views/likes, channel info — from the watch page (`/next`).
+    public internal(set) var videoDetails: VideoDetails?
+    /// Likes and estimated dislikes (Return YouTube Dislike), when enabled in Settings.
+    public internal(set) var votes: VideoVotes?
     public internal(set) var hasPrevious: Bool = false
     public internal(set) var hasNext: Bool = false
     /// The last stream URL handed to AVPlayer (primary or fallback). Stamped onto
@@ -193,6 +197,14 @@ public final class PlaybackViewModel {
     let comments: CommentsController
     public var likeStatus: LikeStatus { likeDislike.likeStatus }
     public func like() { likeDislike.like(videoId: currentVideo?.id) }
+    /// The watch page's exact count, else the player response's, else the card's.
+    public var viewCount: Int? { videoDetails?.viewCount ?? playerInfo?.video.viewCount ?? currentVideo?.viewCount }
+    /// YouTube's exact count when the watch page gave one, else Return YouTube Dislike's.
+    public var likeCount: Int? { videoDetails?.likeCount ?? votes?.likes }
+    /// "18K".
+    public var likeCountText: String? { likeCount.map(compactCount) }
+    /// "392" — estimated by Return YouTube Dislike; nil when that's off or unavailable.
+    public var dislikeCountText: String? { votes.map { compactCount($0.dislikes) } }
     public func dislike() { likeDislike.dislike(videoId: currentVideo?.id) }
     public internal(set) var statsForNerdsVisible: Bool = false
     public internal(set) var statsSnapshot: StatsForNerdsSnapshot = .empty

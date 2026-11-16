@@ -13,6 +13,8 @@ enum TVLayout {
     static let shortWidth: CGFloat = 230
     static let channelSize: CGFloat = 190
     static let cornerRadius: CGFloat = 14
+    /// Room under a video card for its caption: title, channel, "views · date".
+    static let cardCaptionHeight: CGFloat = 112
     /// Full-page grids: 4 fixed columns sized to fit inside the tvOS safe area.
     static let gridCardWidth: CGFloat = 360
     static let gridColumns = Array(
@@ -113,17 +115,8 @@ struct TVVideoCard: View {
                     .frame(width: width, height: width * 9 / 16)
                     .clipShape(RoundedRectangle(cornerRadius: TVLayout.cornerRadius, style: .continuous))
                     .hoverEffect(.highlight)
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(video.deArrowTitle ?? video.title)
-                        .font(.callout.weight(.semibold))
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-                .frame(width: width, height: 96, alignment: .topLeading)
+                TVVideoCaption(video: video)
+                    .frame(width: width, height: TVLayout.cardCaptionHeight, alignment: .topLeading)
             }
         }
         .buttonStyle(.borderless)
@@ -135,13 +128,6 @@ struct TVVideoCard: View {
         }
     }
 
-    private var subtitle: String {
-        var parts: [String] = []
-        if !video.channelTitle.isEmpty { parts.append(video.channelTitle) }
-        if video.viewCount != nil { parts.append(video.formattedViewCount) }
-        if let published = video.publishedTimeText, !published.isEmpty { parts.append(published) }
-        return parts.joined(separator: " · ")
-    }
 }
 
 /// A card's "remove from this shelf" menu action.
@@ -189,9 +175,7 @@ struct TVShortCard: View {
                 .frame(width: TVLayout.shortWidth, height: TVLayout.shortWidth * 16 / 9)
                 .clipShape(RoundedRectangle(cornerRadius: TVLayout.cornerRadius, style: .continuous))
                 .hoverEffect(.highlight)
-                Text(video.title)
-                    .font(.caption.weight(.semibold))
-                    .lineLimit(2)
+                TVVideoCaption(video: video, titleFont: .caption.weight(.semibold), showsChannel: false)
                     .frame(width: TVLayout.shortWidth, height: 64, alignment: .topLeading)
             }
         }
@@ -456,7 +440,7 @@ struct TVShelfSkeleton: View {
                         RoundedRectangle(cornerRadius: 6).fill(Color.white.opacity(0.04))
                             .frame(width: TVLayout.cardWidth * 0.5, height: 18)
                     }
-                    .frame(height: TVLayout.cardWidth * 9 / 16 + 18 + 96, alignment: .top)
+                    .frame(height: TVLayout.cardWidth * 9 / 16 + 18 + TVLayout.cardCaptionHeight, alignment: .top)
                 }
             }
             .padding(.horizontal, TVLayout.pageInset)

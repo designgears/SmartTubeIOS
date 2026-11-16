@@ -47,6 +47,7 @@ public struct SettingsView: View {
             uiSection
             sponsorBlockSection
             deArrowSection
+            dislikesSection
             parentalControlsSection
             #if os(macOS)
             experimentalSection
@@ -564,6 +565,21 @@ public struct SettingsView: View {
             Text("DeArrow")
         } footer: {
             Text("Replace clickbait titles and thumbnails with community-sourced alternatives.")
+        }
+    }
+
+    // MARK: - Return YouTube Dislike
+
+    private var dislikesSection: some View {
+        @Bindable var store = store
+        return Section {
+            Toggle("Show Dislikes", isOn: $store.settings.showDislikes)
+        } header: {
+            Text("Return YouTube Dislike")
+        } footer: {
+            Text(
+                "Shows likes and estimated dislikes from returnyoutubedislike.com with a video's details. "
+                    + "The video's ID is sent to that service.")
         }
     }
 

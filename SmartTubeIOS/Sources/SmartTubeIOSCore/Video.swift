@@ -133,11 +133,7 @@ public extension Video {
 
     var formattedViewCount: String {
         guard let viewCount else { return "" }
-        switch viewCount {
-        case 0..<1_000: return "\(viewCount) views"
-        case 1_000..<1_000_000: return String(format: "%.1fK views", Double(viewCount) / 1_000)
-        default: return String(format: "%.1fM views", Double(viewCount) / 1_000_000)
-        }
+        return "\(compactCount(viewCount)) \(viewCount == 1 ? "view" : "views")"
     }
 
     /// High-quality thumbnail URL using YouTube's image CDN (480×360, always available).

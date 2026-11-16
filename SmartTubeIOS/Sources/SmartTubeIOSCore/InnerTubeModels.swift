@@ -31,6 +31,8 @@ public struct NextInfo: Sendable, Codable {
     public let relatedVideos: [Video]
     public let likeStatus: LikeStatus
     public let chapters: [Chapter]
+    /// Publish date, exact views/likes and channel info (WEB `/next` only).
+    public var details: VideoDetails?
 }
 
 // MARK: - Comment

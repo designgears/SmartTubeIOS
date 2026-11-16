@@ -153,6 +153,10 @@ public struct AppSettings: Codable {
     // MARK: DeArrow
     public var deArrowEnabled: Bool
 
+    // MARK: Return YouTube Dislike
+    /// Shows likes and (estimated) dislikes from returnyoutubedislike.com in the player.
+    public var showDislikes: Bool
+
     // MARK: Network
     /// Optional URL of a self-hosted poToken microservice (e.g. youtube-trusted-session-generator).
     /// When set, `ServerPoTokenProvider` is wired up to `InnerTubeAPI` so poToken is injected
@@ -317,6 +321,7 @@ public struct AppSettings: Codable {
         preferredAudioLanguage = nil
         preferredCaptionLanguage = nil
         deArrowEnabled = false
+        showDislikes = true
         poTokenServiceURL = nil
         audioOnlyMode = false
         preferH264 = false
@@ -397,6 +402,7 @@ extension AppSettings {
         case preferredAudioLanguage
         case preferredCaptionLanguage
         case deArrowEnabled
+        case showDislikes
         case poTokenServiceURL
         case audioOnlyMode
         case preferH264
@@ -446,10 +452,14 @@ extension AppSettings {
         accentColor = c.safeDecode(AccentColorChoice.self, forKey: .accentColor, default: d.accentColor)
         let columns = Self.availableGridColumnCounts
         gridColumnsPortrait = min(
-            max(c.safeDecode(Int.self, forKey: .gridColumnsPortrait, default: d.gridColumnsPortrait), columns.lowerBound),
+            max(
+                c.safeDecode(Int.self, forKey: .gridColumnsPortrait, default: d.gridColumnsPortrait), columns.lowerBound
+            ),
             columns.upperBound)
         gridColumnsLandscape = min(
-            max(c.safeDecode(Int.self, forKey: .gridColumnsLandscape, default: d.gridColumnsLandscape), columns.lowerBound),
+            max(
+                c.safeDecode(Int.self, forKey: .gridColumnsLandscape, default: d.gridColumnsLandscape),
+                columns.lowerBound),
             columns.upperBound)
         enabledSections = c.safeDecode(
             [BrowseSection.SectionType].self, forKey: .enabledSections, default: d.enabledSections)
@@ -468,6 +478,7 @@ extension AppSettings {
         preferredCaptionLanguage = c.safeDecode(
             String?.self, forKey: .preferredCaptionLanguage, default: d.preferredCaptionLanguage)
         deArrowEnabled = c.safeDecode(Bool.self, forKey: .deArrowEnabled, default: d.deArrowEnabled)
+        showDislikes = c.safeDecode(Bool.self, forKey: .showDislikes, default: d.showDislikes)
         poTokenServiceURL = c.safeDecode(URL?.self, forKey: .poTokenServiceURL, default: d.poTokenServiceURL)
         audioOnlyMode = c.safeDecode(Bool.self, forKey: .audioOnlyMode, default: d.audioOnlyMode)
         preferH264 = c.safeDecode(Bool.self, forKey: .preferH264, default: d.preferH264)

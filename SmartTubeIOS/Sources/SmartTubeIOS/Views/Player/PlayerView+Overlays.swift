@@ -422,7 +422,8 @@ extension PlayerView {
                     showMoreMenu = false
                 } label: {
                     Label(
-                        vm.likeStatus == .like ? "Liked" : "Like",
+                        [vm.likeStatus == .like ? "Liked" : "Like", vm.likeCountText].compactMap { $0 }
+                            .joined(separator: " · "),
                         systemImage: vm.likeStatus == .like
                             ? "\(AppSymbol.thumbsUp).fill" : AppSymbol.thumbsUp
                     )
@@ -444,7 +445,8 @@ extension PlayerView {
                     showMoreMenu = false
                 } label: {
                     Label(
-                        vm.likeStatus == .dislike ? "Disliked" : "Dislike",
+                        [vm.likeStatus == .dislike ? "Disliked" : "Dislike", vm.dislikeCountText].compactMap { $0 }
+                            .joined(separator: " · "),
                         systemImage: vm.likeStatus == .dislike
                             ? "\(AppSymbol.thumbsDown).fill" : AppSymbol.thumbsDown
                     )

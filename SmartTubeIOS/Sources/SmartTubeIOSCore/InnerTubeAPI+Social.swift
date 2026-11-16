@@ -188,7 +188,9 @@ extension InnerTubeAPI {
             tubeLog.notice(
                 "fetchNextInfo (auth) → related=\(videos.count, privacy: .public) chapters=\(chapters.count, privacy: .public)"
             )
-            return NextInfo(relatedVideos: videos, likeStatus: status, chapters: chapters)
+            return NextInfo(
+                relatedVideos: videos, likeStatus: status, chapters: chapters,
+                details: VideoDetails.parse(next: webData))
         } else {
             let data = try await post(endpoint: "next", body: tvBody)
             let videos = parseRelatedVideos(from: data)
@@ -196,7 +198,8 @@ extension InnerTubeAPI {
             tubeLog.notice(
                 "fetchNextInfo (anon) → related=\(videos.count, privacy: .public) chapters=\(chapters.count, privacy: .public)"
             )
-            return NextInfo(relatedVideos: videos, likeStatus: .none, chapters: chapters)
+            return NextInfo(
+                relatedVideos: videos, likeStatus: .none, chapters: chapters, details: VideoDetails.parse(next: data))
         }
     }
 

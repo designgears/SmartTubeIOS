@@ -86,8 +86,27 @@ struct TVPlayerScreen: View {
             hasNext: vm.hasNext,
             hasPrevious: vm.hasPrevious,
             skipLabel: vm.currentToastSegment.map { "Skip \($0.category.tvLabel)" },
-            hasChannel: (vm.currentVideo ?? video).channelId != nil
+            hasChannel: (vm.currentVideo ?? video).channelId != nil,
+            subtitle: Self.subtitle(vm: vm, fallback: video)
         )
+    }
+
+    /// Channel, views and age: what's known from the card, refined by the watch page.
+    static func subtitle(vm: PlaybackViewModel, fallback: Video) -> String {
+        let video = vm.currentVideo ?? fallback
+        let details = vm.videoDetails
+        var parts: [String] = []
+        // A deep-linked video starts without title or channel; the player response has them.
+        if let channel = video.channelTitle.nilIfEmpty ?? vm.playerInfo?.video.channelTitle.nilIfEmpty {
+            parts.append(channel)
+        }
+        if let views = vm.viewCount ?? video.viewCount {
+            parts.append("\(compactCount(views)) views")
+        }
+        if let age = details?.relativeDateText ?? video.publishedTimeText ?? details?.dateText, !age.isEmpty {
+            parts.append(age)
+        }
+        return parts.joined(separator: " · ")
     }
 
     private func actions(_ vm: PlaybackViewModel) -> TVPlayerActions {
@@ -142,6 +161,8 @@ struct TVPlayerMenuState: Equatable {
     var hasPrevious: Bool
     var skipLabel: String?
     var hasChannel: Bool
+    /// "Channel · 1.5M views · 9 hours ago" — the line under the title in the transport bar.
+    var subtitle: String
 }
 
 struct TVPlayerActions {
@@ -372,6 +393,7 @@ struct TVNativePlayer: UIViewControllerRepresentable {
                     pvc.contextualActions = []
                 }
             }
+            if state.subtitle != previous?.subtitle { applyMetadata() }
             let showChapters = !state.chapters.isEmpty
             if panelsShowChapters != showChapters {
                 panelsShowChapters = showChapters
@@ -387,7 +409,10 @@ struct TVNativePlayer: UIViewControllerRepresentable {
                 rootView: TVUpNextPanel(vm: vm) { [weak self] video in self?.actions?.playVideo(video) })
             upNext.title = "Up Next"
             upNext.preferredContentSize = CGSize(width: 0, height: 400)
-            var panels: [UIViewController] = [upNext]
+            let details = UIHostingController(rootView: TVDetailsPanel(vm: vm, fallback: fallbackVideo))
+            details.title = "Details"
+            details.preferredContentSize = CGSize(width: 0, height: 400)
+            var panels: [UIViewController] = [details, upNext]
             if showChapters {
                 let chapters = UIHostingController(
                     rootView: TVChaptersPanel(vm: vm) { [weak self] start in self?.actions?.seek(start) })
@@ -504,9 +529,11 @@ struct TVNativePlayer: UIViewControllerRepresentable {
         private func applyMetadata() {
             guard let vm, let item = vm.player.currentItem else { return }
             guard let video = vm.currentVideo ?? fallbackVideo else { return }
-            var base: [AVMetadataItem] = [Self.metadata(.commonIdentifierTitle, video.title as NSString)]
-            if !video.channelTitle.isEmpty {
-                base.append(Self.metadata(.iTunesMetadataTrackSubTitle, video.channelTitle as NSString))
+            let title = video.title.nilIfEmpty ?? vm.playerInfo?.video.title ?? ""
+            var base: [AVMetadataItem] = [Self.metadata(.commonIdentifierTitle, title as NSString)]
+            let subtitle = lastState?.subtitle.nilIfEmpty ?? video.channelTitle
+            if !subtitle.isEmpty {
+                base.append(Self.metadata(.iTunesMetadataTrackSubTitle, subtitle as NSString))
             }
             let description = (vm.playerInfo?.video.description ?? video.description) ?? ""
             if !description.isEmpty {
@@ -662,10 +689,8 @@ struct TVUpNextPanel: View {
                                     .frame(width: 340, height: 191)
                                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                                     .hoverEffect(.highlight)
-                                Text(video.title)
-                                    .font(.caption.weight(.semibold))
-                                    .lineLimit(2)
-                                    .frame(width: 340, height: 60, alignment: .topLeading)
+                                TVVideoCaption(video: video, titleFont: .caption.weight(.semibold))
+                                    .frame(width: 340, height: 96, alignment: .topLeading)
                             }
                         }
                         .buttonStyle(.borderless)

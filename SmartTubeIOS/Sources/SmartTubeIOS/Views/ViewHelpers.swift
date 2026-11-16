@@ -155,6 +155,7 @@ enum AppSymbol {
     static let watchLater = "clock.badge"
     static let audioOnly = "waveform.circle"
     static let hide = "eye.slash"
+    static let views = "eye"
 
     // MARK: - Status / info
     static let warning = "exclamationmark.triangle.fill"
@@ -204,4 +205,9 @@ enum AppSymbol {
     static let upNext = "text.line.first.and.arrowtriangle.forward"
     static let warningOutline = "exclamationmark.triangle"
     static let watchLaterFill = "clock.fill"
+}
+
+extension String {
+    /// nil for "", for `a ?? b` fallbacks.
+    var nilIfEmpty: String? { isEmpty ? nil : self }
 }
