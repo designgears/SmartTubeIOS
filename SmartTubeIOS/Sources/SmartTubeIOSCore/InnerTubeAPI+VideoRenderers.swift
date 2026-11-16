@@ -581,10 +581,7 @@ extension InnerTubeAPI {
 
         // percentWatched: thumbnailOverlays[].thumbnailOverlayResumePlaybackRenderer.percentDurationWatched
         // (same path as WEB, used for watch-again resume)
-        let watchProgress: Double? = overlays?.compactMap {
-            ($0["thumbnailOverlayResumePlaybackRenderer"] as? [String: Any])
-                .flatMap { $0["percentDurationWatched"] as? Double }
-        }.first.map { $0 / 100.0 }
+        let watchProgress = Self.resumePercent(in: overlays as Any).map { $0 / 100.0 }
 
         // isLive: thumbnailOverlay style == "LIVE" — Android: TileItem.isLive()
         let isLive =
@@ -879,9 +876,11 @@ extension InnerTubeAPI {
             id: videoId, title: title, channelTitle: channelTitle, channelId: channelId,
             thumbnailURL: thumbURL, duration: duration,
             viewCount: metadata.viewCount,
-            publishedAt: metadata.age?.date(),
-            publishedTimeText: metadata.age?.text,
-            isLive: isLive, isShort: isShort, badges: []
+            publishedAt: metadata.age?.date(), publishedTimeText: metadata.age?.text,
+            isLive: isLive, isShort: isShort,
+            // The red resume bar: overlays[].thumbnailBottomOverlayViewModel.progressBar
+            //   .thumbnailOverlayProgressBarViewModel.startPercent (0–100).
+            watchProgress: Self.resumePercent(in: thumbVM?["overlays"] as Any).map { $0 / 100 }, badges: []
         )
     }
 
