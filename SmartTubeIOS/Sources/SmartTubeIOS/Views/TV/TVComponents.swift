@@ -96,6 +96,8 @@ struct TVBadge: View {
 struct TVVideoCard: View {
     let video: Video
     var width: CGFloat = TVLayout.cardWidth
+    /// Extra long-press action that takes the card off its shelf (e.g. Continue Watching).
+    var removal: TVCardRemoval?
     let action: () -> Void
 
     @Environment(TVNavigator.self) private var navigator
@@ -125,7 +127,7 @@ struct TVVideoCard: View {
             }
         }
         .buttonStyle(.borderless)
-        .contextMenu { TVVideoContextMenu(video: video) }
+        .contextMenu { TVVideoContextMenu(video: video, removal: removal) }
         // Re-read when the player closes so the bar reflects what was just watched.
         .task(id: TVProgressKey(videoId: video.id, playerOpen: navigator.nowPlaying != nil)) {
             guard navigator.nowPlaying == nil else { return }
@@ -142,8 +144,15 @@ struct TVVideoCard: View {
     }
 }
 
+/// A card's "remove from this shelf" menu action.
+struct TVCardRemoval {
+    let title: String
+    let action: () -> Void
+}
+
 struct TVVideoContextMenu: View {
     let video: Video
+    var removal: TVCardRemoval?
     @Environment(TVNavigator.self) private var navigator
     @Environment(AuthService.self) private var auth
     @Environment(\.innerTubeAPI) private var api
@@ -157,6 +166,9 @@ struct TVVideoContextMenu: View {
             Button("Save to Watch Later", systemImage: AppSymbol.clock) {
                 Task { _ = try? await api.addToWatchLater(videoId: video.id) }
             }
+        }
+        if let removal {
+            Button(removal.title, systemImage: AppSymbol.xmarkCircle, role: .destructive, action: removal.action)
         }
     }
 }

@@ -22,6 +22,8 @@ struct TVHomeView: View {
     @Namespace private var focusNamespace
     /// Locally saved watch fractions for history videos (player checkpoints).
     @State private var localProgress: [String: Double] = [:]
+    /// History videos the user removed from Continue Watching (and hasn't watched since).
+    @State private var removedFromContinue: Set<String> = []
     @State private var playerWasOpen = false
 
     var body: some View {
@@ -53,7 +55,9 @@ struct TVHomeView: View {
                     TVShelf(
                         title: "Continue Watching", items: continueWatching, prefetchWidth: TVLayout.cardWidth
                     ) { video in
-                        TVVideoCard(video: video) { navigator.play(video) }
+                        TVVideoCard(video: video, removal: continueWatchingRemoval(video)) {
+                            navigator.play(video)
+                        }
                     }
                 }
 
@@ -118,14 +122,24 @@ struct TVHomeView: View {
             // In place: Continue Watching keeps its cards until the refreshed list arrives.
             historyVM?.refreshInPlace()
         }
-        .task(id: historyVM?.videoGroups.flatMap(\.videos).map(\.id) ?? []) {
+        // Also re-read when the player closes: watching a removed video again brings it back.
+        .task(
+            id: TVHistoryKey(
+                ids: historyVM?.videoGroups.flatMap(\.videos).map(\.id) ?? [],
+                playerOpen: navigator.nowPlaying != nil)
+        ) {
+            guard navigator.nowPlaying == nil else { return }
             var fractions: [String: Double] = [:]
+            var removed: Set<String> = []
             for video in historyVM?.videoGroups.flatMap(\.videos) ?? [] {
-                if let fraction = await VideoStateStore.shared.state(for: video.id)?.watchedFraction {
-                    fractions[video.id] = fraction
+                let state = await VideoStateStore.shared.state(for: video.id)
+                if let fraction = state?.watchedFraction { fractions[video.id] = fraction }
+                if await ContinueWatchingStore.shared.isRemoved(video.id, lastWatched: state?.timestamp) {
+                    removed.insert(video.id)
                 }
             }
             localProgress = fractions
+            removedFromContinue = removed
         }
         // Seed the playback session as soon as there is something to play, so the first
         // Play doesn't wait on the watch-page round-trip.
@@ -172,7 +186,7 @@ struct TVHomeView: View {
         return Array(
             videos.filter { video in
                 let fraction = localProgress[video.id] ?? video.watchProgress ?? 0
-                return fraction > 0.03 && fraction < 0.95 && !video.isShort
+                return fraction > 0.03 && fraction < 0.95 && !video.isShort && !removedFromContinue.contains(video.id)
             }
             .uniquedByID()
             .prefix(20))
@@ -181,6 +195,14 @@ struct TVHomeView: View {
     private var isInitialLoading: Bool {
         if isSignedIn { return homeVM?.isLoadingAny ?? true }
         return popularVM?.isLoading ?? true
+    }
+
+    /// Long-press "Remove from Continue Watching": hides the card now; the saved position stays.
+    private func continueWatchingRemoval(_ video: Video) -> TVCardRemoval {
+        TVCardRemoval(title: "Remove from Continue Watching") {
+            withAnimation { _ = removedFromContinue.insert(video.id) }
+            Task { await ContinueWatchingStore.shared.remove(videoId: video.id) }
+        }
     }
 
     private func loadMoreRecommended() {
@@ -212,6 +234,12 @@ struct TVHomeView: View {
             historyVM?.reload(section: BrowseSection(type: .history))
         }
     }
+}
+
+/// Identity of the history-derived state: the history list, and whether the player is open.
+private struct TVHistoryKey: Hashable {
+    let ids: [String]
+    let playerOpen: Bool
 }
 
 // MARK: - Hero
