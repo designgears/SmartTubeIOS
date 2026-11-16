@@ -65,7 +65,7 @@ struct TVVideoThumbnail: View {
                 }
                 HStack {
                     if video.isLive {
-                        TVBadge(text: "LIVE", background: .red)
+                        TVBadge(text: "LIVE", background: AppColor.live)
                     } else if video.isUpcoming {
                         TVBadge(text: "UPCOMING", background: .black.opacity(0.75))
                     }
@@ -194,7 +194,7 @@ struct TVChannelCard: View {
     let title: String
     let thumbnailURL: URL?
     var subtitle: String?
-    /// Streaming right now: a red ring and a LIVE tag on the avatar, as YouTube marks it.
+    /// Streaming right now: a ring and a LIVE tag on the avatar, as YouTube marks it.
     var isLive = false
     let action: () -> Void
 
@@ -211,10 +211,10 @@ struct TVChannelCard: View {
                 .frame(width: TVLayout.channelSize, height: TVLayout.channelSize)
                 .clipShape(Circle())
                 .overlay {
-                    if isLive { Circle().strokeBorder(.red, lineWidth: 6) }
+                    if isLive { Circle().strokeBorder(AppColor.live, lineWidth: 6) }
                 }
                 .overlay(alignment: .bottom) {
-                    if isLive { TVBadge(text: "LIVE", background: .red).offset(y: 12) }
+                    if isLive { TVBadge(text: "LIVE", background: AppColor.live).offset(y: 12) }
                 }
                 .modifier(TVAvatarFocus())
                 VStack(spacing: 4) {

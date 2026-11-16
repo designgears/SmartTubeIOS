@@ -697,7 +697,7 @@ public struct VideoCardView: View {
             .fontWeight(.bold)
             .padding(.horizontal, 5)
             .padding(.vertical, 2)
-            .background(.red)
+            .background(AppColor.live)
             .foregroundStyle(.white)
             .clipShape(RoundedRectangle(cornerRadius: 3))
             .padding(4)

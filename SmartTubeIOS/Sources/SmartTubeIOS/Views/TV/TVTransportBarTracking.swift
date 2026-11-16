@@ -34,6 +34,8 @@ extension TVNativePlayer.Coordinator {
     func attachSegmentStrip() {
         guard let root = playerView else { return }
         segmentStrip.attach(toTransportBarIn: root)
+        // Same moments suit the LIVE tags, which AVKit also builds lazily.
+        liveBadgeTint.apply(in: root.window ?? root)
     }
 
     @objc private func remoteTouched(_ recognizer: UIGestureRecognizer) {

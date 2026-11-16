@@ -249,6 +249,8 @@ struct TVNativePlayer: UIViewControllerRepresentable {
         private var panelsShowChapters: Bool?
         /// SponsorBlock segments, inside the native transport bar (TVTransportBarTracking.swift).
         let segmentStrip = TVSponsorSegmentStrip()
+        /// AVKit's LIVE tags in the app's live color (TVLiveBadgeTint.swift).
+        let liveBadgeTint = TVLiveBadgeTint()
         var playerView: UIView? { pvc?.view }
 
         func attach(
