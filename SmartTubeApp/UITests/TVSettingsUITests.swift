@@ -139,10 +139,6 @@ final class TVAccountSwitchUITests: XCTestCase {
     private let remote = XCUIRemote.shared
     private let videoId = "u5UTIofKDGc"
 
-    override func setUpWithError() throws {
-        continueAfterFailure = true
-    }
-
     private func launch(active: String, playVideo: Bool) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments =
@@ -200,6 +196,8 @@ final class TVAccountSwitchUITests: XCTestCase {
     }
 
     func testEachAccountKeepsItsOwnDataAndSwitchesFromWhosWatching() {
+        // Keep going past a failed check: the remaining screenshots still help diagnose it.
+        continueAfterFailure = true
         // 1. Alex watches 20 s of a video; closing the player saves the position to Alex.
         var app = launch(active: "uitest-alex", playVideo: true)
         hold(20)
@@ -245,7 +243,8 @@ final class TVAccountSwitchUITests: XCTestCase {
 
         // 5. A Brand channel is its own profile: Alex's "Alex Kids" card.
         XCTAssertTrue(element("Alex Kids", in: app).exists, "each channel of an account is a profile")
-        XCTAssertTrue(focus("Alex Kids", in: app, pressing: .right), "Alex Kids card")  // focus starts on the first card
+        // Focus starts on the first card.
+        XCTAssertTrue(focus("Alex Kids", in: app, pressing: .right), "Alex Kids card")
         remote.press(.select)
         hold(5)
         openWhosWatching(in: app, sidebarOpen: true)
