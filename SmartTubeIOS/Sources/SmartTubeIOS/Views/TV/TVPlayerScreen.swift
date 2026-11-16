@@ -30,7 +30,7 @@ struct TVPlayerScreen: View {
                 TVNativePlayer(
                     vm: vm, state: menuState(vm), actions: actions(vm), fallbackVideo: video,
                     fillsScreen: store.settings.videoGravityMode == .fill,
-                    segments: vm.sponsorSegments, duration: vm.duration,
+                    segments: vm.sponsorSegments, duration: vm.duration, liveColor: AppColor.live(store),
                     transportBar: transportBar
                 )
                 .ignoresSafeArea()
@@ -195,6 +195,8 @@ struct TVNativePlayer: UIViewControllerRepresentable {
     /// SponsorBlock segments for the strip on the scrubber.
     var segments: [SponsorSegment] = []
     var duration: TimeInterval = 0
+    /// Settings › Colors › Live, for AVKit's own LIVE tags.
+    var liveColor: Color
     /// What the player is showing, for the overlays drawn on top of it.
     var transportBar: TVPlayerPresentationState?
 
@@ -212,6 +214,7 @@ struct TVNativePlayer: UIViewControllerRepresentable {
         pvc.delegate = context.coordinator
         context.coordinator.attach(pvc, vm: vm, fallbackVideo: fallbackVideo, actions: actions)
         context.coordinator.apply(state: state)
+        context.coordinator.liveBadgeTint.color = UIColor(liveColor)
         context.coordinator.updateSegmentStrip(segments: segments, duration: duration)
         return pvc
     }
@@ -221,6 +224,7 @@ struct TVNativePlayer: UIViewControllerRepresentable {
         context.coordinator.apply(state: state)
         let gravity: AVLayerVideoGravity = fillsScreen ? .resizeAspectFill : .resizeAspect
         if pvc.videoGravity != gravity { pvc.videoGravity = gravity }
+        context.coordinator.liveBadgeTint.color = UIColor(liveColor)
         context.coordinator.updateSegmentStrip(segments: segments, duration: duration)
     }
 

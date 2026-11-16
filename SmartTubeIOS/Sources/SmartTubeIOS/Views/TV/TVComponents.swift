@@ -35,11 +35,13 @@ extension Array where Element == Video {
 struct TVVideoThumbnail: View {
     let video: Video
     var showsBadges = true
-    /// Watched fraction to draw as the red bar (the saved resume position). Without one, the
+    /// Watched fraction to draw as the watched bar (the saved resume position). Without one, the
     /// most seen here or on YouTube (`WatchedStore`), so finished videos keep a full bar.
     var progress: Double?
     /// On-screen width, so the thumbnail is downsampled to the size actually shown.
     var pointWidth: CGFloat = TVLayout.cardWidth
+    /// Optional: a thumbnail outside the settings environment gets the default colors.
+    @Environment(SettingsStore.self) private var store: SettingsStore?
 
     /// Thumbnail candidates, best first. Shared with prefetching so cache keys match.
     static func urls(for video: Video) -> [URL] {
@@ -57,7 +59,7 @@ struct TVVideoThumbnail: View {
                             Spacer()
                             ZStack(alignment: .leading) {
                                 Rectangle().fill(.white.opacity(0.35))
-                                Rectangle().fill(.red).frame(width: geo.size.width * min(progress, 1))
+                                Rectangle().fill(AppColor.watched(store)).frame(width: geo.size.width * min(progress, 1))
                             }
                             .frame(height: 6)
                         }
@@ -65,7 +67,7 @@ struct TVVideoThumbnail: View {
                 }
                 HStack {
                     if video.isLive {
-                        TVBadge(text: "LIVE", background: AppColor.live)
+                        TVBadge(text: "LIVE", background: AppColor.live(store))
                     } else if video.isUpcoming {
                         TVBadge(text: "UPCOMING", background: .black.opacity(0.75))
                     }
@@ -197,6 +199,7 @@ struct TVChannelCard: View {
     /// Streaming right now: a ring and a LIVE tag on the avatar, as YouTube marks it.
     var isLive = false
     let action: () -> Void
+    @Environment(SettingsStore.self) private var store: SettingsStore?
 
     var body: some View {
         Button(action: action) {
@@ -211,10 +214,10 @@ struct TVChannelCard: View {
                 .frame(width: TVLayout.channelSize, height: TVLayout.channelSize)
                 .clipShape(Circle())
                 .overlay {
-                    if isLive { Circle().strokeBorder(AppColor.live, lineWidth: 6) }
+                    if isLive { Circle().strokeBorder(AppColor.live(store), lineWidth: 6) }
                 }
                 .overlay(alignment: .bottom) {
-                    if isLive { TVBadge(text: "LIVE", background: AppColor.live).offset(y: 12) }
+                    if isLive { TVBadge(text: "LIVE", background: AppColor.live(store)).offset(y: 12) }
                 }
                 .modifier(TVAvatarFocus())
                 VStack(spacing: 4) {

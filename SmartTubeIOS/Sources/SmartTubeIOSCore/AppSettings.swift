@@ -98,6 +98,12 @@ public struct AppSettings: Codable {
     public var perDeviceRecommendationsEnabled: Bool
     public var themeName: ThemeName
     public var accentColor: AccentColorChoice
+    /// The default for `liveColor` and `watchedBarColor`, and what `.system` means for them.
+    public static let defaultMarkColor = AccentColorChoice.blue
+    /// LIVE badges, rings and tags, the player's own included.
+    public var liveColor: AccentColorChoice
+    /// The bar on a card showing how much of the video has been watched.
+    public var watchedBarColor: AccentColorChoice
     /// Video grid column count when the window is taller than wide (ignored on tvOS).
     public var gridColumnsPortrait: Int
     /// Video grid column count when the window is wider than tall (ignored on tvOS).
@@ -315,6 +321,8 @@ public struct AppSettings: Codable {
         perDeviceRecommendationsEnabled = true
         themeName = .system
         accentColor = .system
+        liveColor = Self.defaultMarkColor
+        watchedBarColor = Self.defaultMarkColor
         gridColumnsPortrait = 2
         gridColumnsLandscape = 3
         enabledSections = BrowseSection.defaultSections.map(\.type)
@@ -411,6 +419,8 @@ extension AppSettings {
         case perDeviceRecommendationsEnabled
         case themeName
         case accentColor
+        case liveColor
+        case watchedBarColor
         case gridColumnsPortrait
         case gridColumnsLandscape
         case enabledSections
@@ -441,6 +451,15 @@ extension AppSettings {
             (try? legacy.decode(Bool.self, forKey: .disableLiquidGlass)) == true
         else { return nil }
         return .solid
+    }
+
+    /// A saved mark color, or the default (settings from before it existed, or unknown values).
+    private static func markColor(
+        _ container: KeyedDecodingContainer<CodingKeys>, _ key: CodingKeys
+    )
+        -> AccentColorChoice
+    {
+        container.safeDecode(AccentColorChoice.self, forKey: key, default: defaultMarkColor)
     }
 
     public init(from decoder: Decoder) throws {
@@ -489,6 +508,7 @@ extension AppSettings {
             Bool.self, forKey: .perDeviceRecommendationsEnabled, default: d.perDeviceRecommendationsEnabled)
         themeName = c.safeDecode(ThemeName.self, forKey: .themeName, default: d.themeName)
         accentColor = c.safeDecode(AccentColorChoice.self, forKey: .accentColor, default: d.accentColor)
+        (liveColor, watchedBarColor) = (Self.markColor(c, .liveColor), Self.markColor(c, .watchedBarColor))
         let columns = Self.availableGridColumnCounts
         gridColumnsPortrait = min(
             max(

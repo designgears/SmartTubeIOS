@@ -4,7 +4,7 @@ import UIKit
 // MARK: - The player's LIVE tag in the app's live color
 
 /// Recolors AVKit's own LIVE tags (beside the subtitle, and at the scrubber's live edge) from
-/// the system pink to `AppColor.live`. AVKit has no API for it: each tag is an
+/// the system pink to `color` (Settings › Colors › Live, via `AppColor.live`). AVKit has no API for it: each tag is an
 /// `AVUnifiedPlayerPlaybackStyleBadgeView` over a visual-effect view whose fill is a plain
 /// background color. AVKit re-sets that color as the tag changes state, so each fill is
 /// watched and recolored again — but only while it's the live pink (a tag showing something
@@ -12,7 +12,17 @@ import UIKit
 @MainActor
 final class TVLiveBadgeTint {
     private var observations: [ObjectIdentifier: NSKeyValueObservation] = [:]
-    private let live = UIColor(AppColor.live)
+    /// Fills already given `color`, to repaint when the setting changes.
+    private let tinted = NSHashTable<UIView>.weakObjects()
+
+    var color = UIColor(AppColor.live(nil)) {
+        didSet {
+            guard color != oldValue else { return }
+            for fill in tinted.allObjects where fill.backgroundColor == oldValue {
+                fill.backgroundColor = color
+            }
+        }
+    }
 
     func apply(in root: UIView) {
         for fill in Self.badgeFills(in: root) where observations[ObjectIdentifier(fill)] == nil {
@@ -31,8 +41,11 @@ final class TVLiveBadgeTint {
     }
 
     private func recolor(_ fill: UIView) {
-        guard let current = fill.backgroundColor, Self.isSystemLive(current, in: fill.traitCollection) else { return }
-        fill.backgroundColor = live
+        guard let current = fill.backgroundColor, current != color,
+            Self.isSystemLive(current, in: fill.traitCollection)
+        else { return }
+        fill.backgroundColor = color
+        tinted.add(fill)
     }
 
     /// The system's live pink (or red, should it move back to it).

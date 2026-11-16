@@ -35,6 +35,7 @@ public struct SettingsView: View {
             #if !os(tvOS)
             AppearanceSettingsSection()
             #endif
+            ColorSettingsSection()
             PrivacySettingsSection()
             CommunitySettingsSection()
             ParentalControlsSettingsSection()

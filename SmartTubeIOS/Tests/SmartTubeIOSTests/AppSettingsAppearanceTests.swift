@@ -26,6 +26,25 @@ struct AppSettingsAppearanceTests {
         #expect(decoded.accentColor == choice)
     }
 
+    @Test("Live and watched-bar colors default to blue, also for settings saved before them")
+    func markColorsDefaultToBlue() throws {
+        let old = try decode("{}")
+        #expect(old.liveColor == .blue)
+        #expect(old.watchedBarColor == .blue)
+        #expect(AppSettings().liveColor == AppSettings.defaultMarkColor)
+    }
+
+    @Test("Live and watched-bar colors round-trip independently")
+    func markColorsRoundTrip() throws {
+        var settings = AppSettings()
+        settings.liveColor = .purple
+        settings.watchedBarColor = .green
+        let decoded = try JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(settings))
+        #expect(decoded.liveColor == .purple)
+        #expect(decoded.watchedBarColor == .green)
+        #expect(try decode(#"{"liveColor": "chartreuse"}"#).liveColor == .blue)
+    }
+
     @Test("Unknown accent color falls back to system")
     func unknownAccentColor() throws {
         #expect(try decode(#"{"accentColor": "chartreuse"}"#).accentColor == .system)

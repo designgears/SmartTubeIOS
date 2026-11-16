@@ -5,6 +5,8 @@ enum AccessibilityID {
         static let accountsLink = "settings.accountsLink"
         static let addAccountButton = "settings.addAccountButton"
         static let changePINButton = "settings.changePINButton"
+        static let liveColorPicker = "settings.liveColorPicker"
+        static let watchedBarColorPicker = "settings.watchedBarColorPicker"
         static let clearLocalHistoryButton = "settings.clearLocalHistoryButton"
         static let deArrowToggle = "settings.deArrowToggle"
         static let disableAnalyticsToggle = "settings.disableAnalyticsToggle"

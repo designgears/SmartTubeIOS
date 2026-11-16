@@ -626,7 +626,7 @@ public struct VideoCardView: View {
                 Rectangle()
                     .fill(Color.black.opacity(0.3))
                 Rectangle()
-                    .fill(Color.red)
+                    .fill(AppColor.watched(store))
                     .frame(width: geo.size.width * fraction)
             }
         }
@@ -697,7 +697,7 @@ public struct VideoCardView: View {
             .fontWeight(.bold)
             .padding(.horizontal, 5)
             .padding(.vertical, 2)
-            .background(AppColor.live)
+            .background(AppColor.live(store))
             .foregroundStyle(.white)
             .clipShape(RoundedRectangle(cornerRadius: 3))
             .padding(4)

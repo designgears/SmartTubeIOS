@@ -25,7 +25,7 @@ struct WatchedSettingsSection: View {
             Text(
                 "Hide in Feeds covers Home, Subscriptions and Explore. Skip When Playing Next covers autoplay, "
                     + "Next, queues and playlists. History and Continue Watching are left as they are, and music "
-                    + "is never hidden or skipped unless Include Music is on. Watched videos show a red bar.")
+                    + "is never hidden or skipped unless Include Music is on. Watched videos show a bar (Colors › Watched Bar).")
         }
     }
 
