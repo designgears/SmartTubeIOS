@@ -11,14 +11,18 @@ public struct YouTubeChannel: Sendable, Hashable, Identifiable, Codable {
     public let avatarURL: URL?
     /// nil for the primary account.
     public let pageId: String?
+    /// The channel's handle (e.g. "@designgears"). Channels of one account can share a name
+    /// and photo; the handle is what tells them apart.
+    public var handle: String?
 
     public var id: String { pageId ?? "primary" }
     public var isPrimary: Bool { pageId == nil }
 
-    public init(name: String, avatarURL: URL?, pageId: String?) {
+    public init(name: String, avatarURL: URL?, pageId: String?, handle: String? = nil) {
         self.name = name
         self.avatarURL = avatarURL
         self.pageId = pageId
+        self.handle = handle
     }
 
     /// Parses every account of an `account/accounts_list` response (requested with
@@ -44,10 +48,15 @@ public struct YouTubeChannel: Sendable, Hashable, Identifiable, Codable {
         let endpoint = (item["serviceEndpoint"] as? [String: Any])?["selectActiveIdentityEndpoint"] as? [String: Any]
         let pageId = (endpoint?["supportedTokens"] as? [[String: Any]])?
             .compactMap { ($0["pageIdToken"] as? [String: Any])?["pageId"] as? String }.first
+        let handleDict = item["channelHandle"] as? [String: Any]
+        let handle =
+            (handleDict?["runs"] as? [[String: Any]])?.compactMap { $0["text"] as? String }.joined()
+            ?? handleDict?["simpleText"] as? String
         return YouTubeChannel(
             name: name,
             avatarURL: avatar.flatMap { URL(string: $0.hasPrefix("//") ? "https:\($0)" : $0) },
-            pageId: pageId
+            pageId: pageId,
+            handle: handle?.isEmpty == false ? handle : nil
         )
     }
 }

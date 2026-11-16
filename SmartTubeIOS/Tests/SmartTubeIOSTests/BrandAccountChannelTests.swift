@@ -33,11 +33,13 @@ private func accountItem(
     name: String,
     pageId: String?,
     avatar: String? = nil,
-    nameAsRuns: Bool = false
+    nameAsRuns: Bool = false,
+    handle: String? = nil
 ) -> [String: Any] {
     var item: [String: Any] = [
         "accountName": nameAsRuns ? ["runs": [["text": name]]] : ["simpleText": name]
     ]
+    if let handle { item["channelHandle"] = ["runs": [["text": handle]]] }
     if let avatar { item["accountPhoto"] = ["thumbnails": [["url": "//small"], ["url": avatar]]] }
     if let pageId {
         item["serviceEndpoint"] = [
@@ -73,6 +75,25 @@ struct BrandAccountParsingTests {
         #expect(channels[0].isPrimary == false)
         #expect(channels[1].pageId == nil)
         #expect(channels[1].isPrimary)
+    }
+
+    /// Channels of one account can share a name and photo (seen on a real account); the
+    /// handle is what tells them apart.
+    @Test("reads each channel's handle so same-named channels can be told apart")
+    func readsChannelHandles() {
+        let json = accountsList([
+            accountItem(name: "Same Name", pageId: "100000000000000000001", handle: "@brandhandle"),
+            accountItem(name: "Same Name", pageId: nil, handle: "@personal-x1"),
+        ])
+
+        let channels = YouTubeChannel.list(fromAccountsList: json)
+
+        #expect(channels.map(\.handle) == ["@brandhandle", "@personal-x1"])
+        var account = SavedAccount(id: "acct")
+        account.channels = channels
+        #expect(
+            AccountProfile.profiles(for: account).map(\.displayLabel)
+                == ["Same Name (@brandhandle)", "Same Name (@personal-x1)"])
     }
 
     // deve ler o nome em runs e normalizar o avatar protocol-relative para https

@@ -31,7 +31,9 @@ struct TVAccountsView: View {
                         TVChannelCard(
                             title: profile.name,
                             thumbnailURL: profile.avatarURL,
-                            subtitle: isCurrent ? "Current" : nil
+                            // The handle tells apart channels that share a name and photo.
+                            subtitle: [isCurrent ? "Current" : nil, profile.handle].compactMap { $0 }
+                                .joined(separator: " · ").nilIfEmpty
                         ) {
                             if !isCurrent { auth.switchProfile(profile) }
                             navigator.selection = .home
@@ -111,5 +113,9 @@ struct TVAddAccountCard: View {
         }
         .buttonStyle(TVPlainFocusButtonStyle())
     }
+}
+
+private extension String {
+    var nilIfEmpty: String? { isEmpty ? nil : self }
 }
 #endif

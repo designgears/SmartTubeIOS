@@ -48,12 +48,20 @@ public struct AccountProfile: Identifiable, Equatable, Sendable {
     public let pageId: String?
     public let name: String
     public let avatarURL: URL?
+    /// The channel's handle — what tells apart channels that share a name and photo.
+    public let handle: String?
 
-    public init(accountId: String, pageId: String?, name: String, avatarURL: URL?) {
+    public init(accountId: String, pageId: String?, name: String, avatarURL: URL?, handle: String? = nil) {
         self.accountId = accountId
         self.pageId = pageId
         self.name = name
         self.avatarURL = avatarURL
+        self.handle = handle
+    }
+
+    /// "Name (@handle)" — for single-line lists like Settings.
+    public var displayLabel: String {
+        handle.map { "\(name) (\($0))" } ?? name
     }
 
     public var id: String { Self.slot(accountId: accountId, pageId: pageId) }
@@ -77,11 +85,13 @@ public struct AccountProfile: Identifiable, Equatable, Sendable {
                 AccountProfile(
                     accountId: account.id, pageId: nil,
                     name: account.primaryName ?? account.displayName ?? "Account",
-                    avatarURL: channels.first?.avatarURL ?? account.displayAvatarURL)
+                    avatarURL: channels.first?.avatarURL ?? account.displayAvatarURL,
+                    handle: channels.first?.handle)
             ]
         }
         return channels.map {
-            AccountProfile(accountId: account.id, pageId: $0.pageId, name: $0.name, avatarURL: $0.avatarURL)
+            AccountProfile(
+                accountId: account.id, pageId: $0.pageId, name: $0.name, avatarURL: $0.avatarURL, handle: $0.handle)
         }
     }
 }
