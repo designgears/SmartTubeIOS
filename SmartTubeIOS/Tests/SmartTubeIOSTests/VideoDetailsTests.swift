@@ -97,3 +97,35 @@ struct VideoDetailsTests {
         #expect(compactCount(value) == expected)
     }
 }
+
+@Suite("Up Next paging — related continuation")
+struct RelatedContinuationTests {
+    private func continuationItem(_ token: String) -> [String: Any] {
+        ["continuationItemRenderer": ["continuationEndpoint": ["continuationCommand": ["token": token]]]]
+    }
+
+    @Test func firstPageTokenComesFromSecondaryResults() async {
+        let api = InnerTubeAPI()
+        let next: [String: Any] = [
+            "contents": [
+                "twoColumnWatchNextResults": [
+                    "secondaryResults": ["secondaryResults": ["results": [continuationItem("related_p2")]]]
+                ]
+            ],
+            // Comments carry their own continuation; it must not be mistaken for Up Next's.
+            "engagementPanels": [continuationItem("comments_token")],
+        ]
+        #expect(await api.relatedContinuation(in: next) == "related_p2")
+    }
+
+    @Test func laterPagesTokenComesFromAppendedItems() async {
+        let api = InnerTubeAPI()
+        let page: [String: Any] = [
+            "onResponseReceivedEndpoints": [
+                ["appendContinuationItemsAction": ["continuationItems": [continuationItem("related_p3")]]]
+            ]
+        ]
+        #expect(await api.relatedContinuation(in: page) == "related_p3")
+        #expect(await api.relatedContinuation(in: [:]) == nil)
+    }
+}

@@ -132,6 +132,11 @@ public final class PlaybackViewModel {
     /// Short message displayed by `ToastModifier` in the player; cleared automatically after 2 s.
     public var toastMessage: String? = nil
     public internal(set) var relatedVideos: [Video] = []
+    /// Next page of `relatedVideos` (see `loadMoreRelated`), nil at the end.
+    var relatedContinuation: String?
+    var isLoadingMoreRelated = false
+    /// Bumped for every page of related videos fetched — lists key their "load more" on it.
+    public internal(set) var relatedPagesLoaded = 0
     public internal(set) var chapters: [Chapter] = []
     /// Publish date, exact views/likes, channel info — from the watch page (`/next`).
     public internal(set) var videoDetails: VideoDetails?

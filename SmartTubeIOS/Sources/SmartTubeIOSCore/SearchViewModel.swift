@@ -183,14 +183,16 @@ public final class ChannelViewModel {
     public private(set) var channel: Channel?
     /// The channel's Videos tab, newest first. This is the only list that pages.
     public private(set) var videos: [Video] = []
-    /// Shorts from the channel's Home tab. The Videos tab does not list Shorts, so they come
-    /// from the Home shelf and are not paged.
+    /// The channel's Shorts tab (pages with `loadMoreShorts`), or the Home tab's Shorts shelf
+    /// when there's no Shorts tab.
     public private(set) var shorts: [Video] = []
     public private(set) var isLoading: Bool = false
     public var error: Error?
 
     private let api: any InnerTubeAPIProtocol
     private var nextPageToken: String?
+    private var shortsNextPageToken: String?
+    private var isLoadingShorts = false
     private var hideObserverTasks: [Task<Void, Never>] = []
 
     public init(api: any InnerTubeAPIProtocol = InnerTubeAPI()) {
@@ -222,8 +224,14 @@ public final class ChannelViewModel {
                 videos = home.videos
                 nextPageToken = home.nextPageToken
             }
-            var seen = Set<String>()
-            shorts = (home.videos + videos).filter { $0.isShort && seen.insert($0.id).inserted }
+            let shortsTab = try? await api.fetchChannelShorts(channelId: ch.id, continuationToken: nil)
+            if let shortsTab, !shortsTab.videos.isEmpty {
+                shorts = shortsTab.videos
+                shortsNextPageToken = shortsTab.nextPageToken
+            } else {
+                var seen = Set<String>()
+                shorts = (home.videos + videos).filter { $0.isShort && seen.insert($0.id).inserted }
+            }
         } catch {
             self.error = error
         }
@@ -245,6 +253,19 @@ public final class ChannelViewModel {
             nextPageToken = group.nextPageToken
         } catch {
             self.error = error
+        }
+    }
+
+    /// Appends the next page of the Shorts tab.
+    public func loadMoreShorts() {
+        guard let id = channel?.id, let token = shortsNextPageToken, !isLoadingShorts else { return }
+        isLoadingShorts = true
+        Task {
+            defer { isLoadingShorts = false }
+            guard let page = try? await api.fetchChannelShorts(channelId: id, continuationToken: token) else { return }
+            let known = Set(shorts.map(\.id))
+            shorts += page.videos.filter { !known.contains($0.id) }
+            shortsNextPageToken = page.nextPageToken
         }
     }
 

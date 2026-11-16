@@ -37,6 +37,8 @@ public protocol InnerTubeAPIProtocol: AnyObject, Sendable {
     func fetchChannelThumbnailURL(channelId: String) async throws -> URL?
     func fetchChannel(channelId: String) async throws -> (channel: Channel, videos: VideoGroup)
     func fetchChannelVideos(channelId: String, continuationToken: String?) async throws -> VideoGroup
+    /// The channel's Shorts tab, paged like the Videos tab.
+    func fetchChannelShorts(channelId: String, continuationToken: String?) async throws -> VideoGroup
 
     // MARK: Search
     func search(query: String, continuationToken: String?, filter: SearchFilter) async throws -> VideoGroup
@@ -60,6 +62,11 @@ public protocol InnerTubeAPIProtocol: AnyObject, Sendable {
 // MARK: - Default-parameter convenience wrappers
 
 public extension InnerTubeAPIProtocol {
+
+    /// Fakes without a Shorts tab: none (the channel page falls back to its Home shelf).
+    func fetchChannelShorts(channelId: String, continuationToken: String?) throws -> VideoGroup {
+        VideoGroup(title: "", videos: [])
+    }
 
     /// Fetches the flat recommended home feed from the first page.
     func fetchHome() async throws -> VideoGroup {

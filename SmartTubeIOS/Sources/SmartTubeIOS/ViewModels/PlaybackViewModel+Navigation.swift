@@ -185,4 +185,21 @@ extension PlaybackViewModel {
         DiagnosticsLogger.setIntendedVideo(id: next.id, title: next.title)
         load(video: next)
     }
+
+    /// Appends the next page of related videos (Up Next scrolled to its end).
+    public func loadMoreRelated() {
+        guard let token = relatedContinuation, !isLoadingMoreRelated else { return }
+        isLoadingMoreRelated = true
+        let videoId = currentVideo?.id
+        Task {
+            defer { isLoadingMoreRelated = false }
+            guard let page = try? await api.fetchMoreRelated(continuation: token),
+                currentVideo?.id == videoId
+            else { return }
+            let known = Set(relatedVideos.map(\.id)).union([videoId].compactMap { $0 })
+            relatedVideos += page.videos.filter { !known.contains($0.id) }
+            relatedContinuation = page.continuation
+            relatedPagesLoaded += 1
+        }
+    }
 }

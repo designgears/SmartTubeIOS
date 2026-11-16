@@ -69,7 +69,7 @@ struct TVHomeView: View {
                 if !recommended.isEmpty {
                     TVShelf(
                         title: "Recommended", items: recommended, onReachEnd: loadMoreRecommended,
-                        prefetchWidth: TVLayout.cardWidth
+                        pageKey: recommendedSourceCount, prefetchWidth: TVLayout.cardWidth
                     ) { video in
                         TVVideoCard(video: video) { navigator.play(video) }
                     }
@@ -77,16 +77,21 @@ struct TVHomeView: View {
 
                 if !subscriptionVideos.isEmpty {
                     TVShelf(
-                        title: "From Your Subscriptions", items: subscriptionVideos, prefetchWidth: TVLayout.cardWidth
-                    ) { video in
-                        TVVideoCard(video: video) { navigator.play(video) }
-                    }
+                        title: "From Your Subscriptions", items: subscriptionVideos,
+                        onReachEnd: {
+                            if let id = subscriptionsSection?.id { homeVM?.loadMore(sectionId: id) }
+                        },
+                        pageKey: subscriptionsSection?.videos.count, prefetchWidth: TVLayout.cardWidth,
+                        card: { video in TVVideoCard(video: video) { navigator.play(video) } }
+                    )
                 }
 
                 if !shorts.isEmpty {
-                    TVShelf(title: "Shorts", items: shorts) { video in
-                        TVShortCard(video: video) { navigator.play(video) }
-                    }
+                    TVShelf(
+                        title: "Shorts", items: shorts, onReachEnd: { homeVM?.loadNextShortsPage() },
+                        pageKey: homeVM?.homeShortsVideos.count,
+                        card: { video in TVShortCard(video: video) { navigator.play(video) } }
+                    )
                 }
 
                 // Explore shelves wait for the main feed so the hero is the first focusable
@@ -171,19 +176,24 @@ struct TVHomeView: View {
     /// The main feed has produced something to show (banner or Recommended shelf).
     private var hasMainContent: Bool { heroVideo != nil || !recommended.isEmpty }
 
+    private var subscriptionsSection: HomeViewModel.SectionState? {
+        homeVM?.sections.first { $0.section.type == .subscriptions }
+    }
+
     private var subscriptionVideos: [Video] {
         guard isSignedIn else { return [] }
-        let subs = homeVM?.sections.first { $0.section.type == .subscriptions }?.videos ?? []
-        return Array(
-            subs.filter { !$0.isShort }.uniquedByID().hidingWatched(in: .subscriptions, settings: store.settings)
-                .prefix(30))
+        let subs = subscriptionsSection?.videos ?? []
+        return subs.filter { !$0.isShort }.uniquedByID().hidingWatched(in: .subscriptions, settings: store.settings)
+    }
+
+    /// Videos the Recommended feed has fetched, before filtering — its shelf's page key.
+    private var recommendedSourceCount: Int {
+        isSignedIn ? (homeVM?.mergedVideos.count ?? 0) : (popularVM?.videoGroups.flatMap(\.videos).count ?? 0)
     }
 
     private var shorts: [Video] {
         guard !hideShorts, isSignedIn else { return [] }
-        return Array(
-            (homeVM?.homeShortsVideos ?? []).uniquedByID().hidingWatched(in: .shorts, settings: store.settings)
-                .prefix(30))
+        return (homeVM?.homeShortsVideos ?? []).uniquedByID().hidingWatched(in: .shorts, settings: store.settings)
     }
 
     private var continueWatching: [Video] {
@@ -344,10 +354,11 @@ struct TVSectionShelf: View {
                 Color.clear.frame(height: 1)
             } else {
                 TVShelf(
-                    title: title, items: Array(videos.prefix(40)),
+                    title: title, items: videos,
                     onReachEnd: {
                         if let vm, let last = vm.videoGroups.last?.videos.last { vm.loadMoreIfNeeded(lastVideo: last) }
                     },
+                    pageKey: vm?.videoGroups.flatMap(\.videos).count,
                     prefetchWidth: TVLayout.cardWidth,
                     card: { video in TVVideoCard(video: video) { navigator.play(video) } }
                 )

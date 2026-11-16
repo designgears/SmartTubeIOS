@@ -156,6 +156,7 @@ extension PlaybackViewModel {
         seekDebounceTask?.cancel()
         isScrubbing = false
         chapters = []
+        relatedContinuation = nil
         videoDetails = nil
         votes = nil
         captionsManager.reset()
@@ -1406,6 +1407,7 @@ extension PlaybackViewModel {
 
             if let nextInfo, !nextInfo.relatedVideos.isEmpty {
                 relatedVideos = nextInfo.relatedVideos.filter { $0.id != video.id }
+                relatedContinuation = nextInfo.relatedContinuation
                 hasNext = !relatedVideos.isEmpty
             } else {
                 let fallbackQuery = video.title.isEmpty ? nil : video.title

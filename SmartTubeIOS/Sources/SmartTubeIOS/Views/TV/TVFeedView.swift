@@ -61,6 +61,7 @@ struct TVFeedView: View {
                 onReachEnd: {
                     if let last = vm.videoGroups.last?.videos.last { vm.loadMoreIfNeeded(lastVideo: last) }
                 },
+                pageKey: vm.videoGroups.flatMap(\.videos).count,
                 onSelect: { navigator.play($0) }
             )
             .environment(\.dimsWatchedVideos, type != .history)

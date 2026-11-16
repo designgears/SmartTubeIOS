@@ -44,9 +44,9 @@ struct ChannelViewModelTests {
 
         #expect(vm.videos.map(\.id) == ["grid1", "grid2"])
         #expect(
-            mock.calls.map(\.method) == ["fetchChannel", "fetchChannelVideos"],
-            "Home supplies the header, the Videos tab supplies the list")
-        #expect(mock.calls.last?.args == ["UCchannel", "nil"])
+            mock.calls.map(\.method) == ["fetchChannel", "fetchChannelVideos", "fetchChannelShorts"],
+            "Home supplies the header, the Videos tab the list, the Shorts tab the Shorts")
+        #expect(mock.calls[1].args == ["UCchannel", "nil"])
     }
 
     @Test("loadMore() continues with the Videos tab token, never the Home token")
@@ -98,5 +98,38 @@ struct ChannelViewModelTests {
         #expect(vm.videos.map(\.id) == ["homeVideo1", "homeShort1"])
         #expect(vm.shorts.map(\.id) == ["homeShort1"])
         #expect(vm.error == nil)
+    }
+
+    /// The Shorts shelf pages to the end through the Shorts tab.
+    @Test("Shorts come from the Shorts tab and page with its token")
+    func shortsPageThroughShortsTab() async throws {
+        let mock = MockInnerTubeAPI()
+        mock.channelResult = (
+            Channel(id: "UCchannel", title: "Channel"),
+            VideoGroup(title: "Home", videos: [video("homeShort", isShort: true)])
+        )
+        mock.channelVideosResult = VideoGroup(title: "V", videos: [video("grid1")])
+        mock.channelShortsResult = VideoGroup(
+            title: "S", videos: [video("s1", isShort: true), video("s2", isShort: true)], nextPageToken: "shorts_p2")
+        let vm = ChannelViewModel(api: mock)
+        await vm.loadAsync(channelId: "UCchannel")
+        #expect(vm.shorts.map(\.id) == ["s1", "s2"], "the tab replaces Home's shelf")
+
+        mock.channelShortsResult = VideoGroup(
+            title: "S", videos: [video("s2", isShort: true), video("s3", isShort: true)])
+        vm.loadMoreShorts()
+        try await waitUntil { vm.shorts.count == 3 }
+        #expect(vm.shorts.map(\.id) == ["s1", "s2", "s3"])
+        #expect(mock.calls.last?.args == ["UCchannel", "shorts_p2"])
+
+        // No token left: the end.
+        let callsAtEnd = mock.calls.count
+        vm.loadMoreShorts()
+        #expect(mock.calls.count == callsAtEnd)
+    }
+
+    private func waitUntil(_ condition: @escaping @MainActor () -> Bool) async throws {
+        for _ in 0..<200 where !condition() { await Task.yield() }
+        #expect(condition())
     }
 }

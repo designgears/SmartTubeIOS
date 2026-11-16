@@ -54,6 +54,7 @@ struct TVSearchView: View {
                 TVVideoGrid(
                     videos: vm.results.uniquedByID(),
                     onReachEnd: { vm.loadMore() },
+                    pageKey: vm.results.count,
                     onSelect: { navigator.play($0) }
                 )
             }

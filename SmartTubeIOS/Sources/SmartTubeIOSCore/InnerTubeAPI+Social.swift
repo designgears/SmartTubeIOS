@@ -190,7 +190,7 @@ extension InnerTubeAPI {
             )
             return NextInfo(
                 relatedVideos: videos, likeStatus: status, chapters: chapters,
-                details: VideoDetails.parse(next: webData))
+                details: VideoDetails.parse(next: webData), relatedContinuation: relatedContinuation(in: webData))
         } else {
             let data = try await post(endpoint: "next", body: tvBody)
             let videos = parseRelatedVideos(from: data)
@@ -199,7 +199,8 @@ extension InnerTubeAPI {
                 "fetchNextInfo (anon) → related=\(videos.count, privacy: .public) chapters=\(chapters.count, privacy: .public)"
             )
             return NextInfo(
-                relatedVideos: videos, likeStatus: .none, chapters: chapters, details: VideoDetails.parse(next: data))
+                relatedVideos: videos, likeStatus: .none, chapters: chapters, details: VideoDetails.parse(next: data),
+                relatedContinuation: relatedContinuation(in: data))
         }
     }
 
@@ -301,7 +302,40 @@ extension InnerTubeAPI {
             "[parseRelatedVideos] found=\(videos.count, privacy: .public) rendererKeys=\(rendererKeysFound.sorted().joined(separator: ","), privacy: .public)"
         )
         var seen = Set<String>()
-        return Array(videos.filter { seen.insert($0.id).inserted }.prefix(25))
+        return videos.filter { seen.insert($0.id).inserted }
+    }
+
+    /// The next page of related videos (Up Next), from a `relatedContinuation` token.
+    public func fetchMoreRelated(continuation: String) async throws -> (videos: [Video], continuation: String?) {
+        let body = makeBody(client: webClientContext, continuationToken: continuation)
+        let data = try await post(endpoint: "next", body: body)
+        return (parseRelatedVideos(from: data), relatedContinuation(in: data))
+    }
+
+    /// The related list's continuation token: in `secondaryResults` on the first page,
+    /// in the appended items of later pages. (Other continuations — comments — are elsewhere.)
+    func relatedContinuation(in json: [String: Any]) -> String? {
+        let firstPage = ((json["contents"] as? [String: Any])?["twoColumnWatchNextResults"] as? [String: Any])?[
+            "secondaryResults"]
+        guard let scope = firstPage ?? json["onResponseReceivedEndpoints"] else { return nil }
+        var token: String?
+        func walk(_ node: Any) {
+            guard token == nil else { return }
+            if let dict = node as? [String: Any] {
+                if let item = dict["continuationItemRenderer"] as? [String: Any],
+                    let command = (item["continuationEndpoint"] as? [String: Any])?["continuationCommand"]
+                        as? [String: Any]
+                {
+                    token = command["token"] as? String
+                    return
+                }
+                dict.values.forEach(walk)
+            } else if let array = node as? [Any] {
+                array.forEach(walk)
+            }
+        }
+        walk(scope)
+        return token
     }
 
     /// Parses video chapters from a `/next` response.

@@ -223,11 +223,15 @@ struct TVChannelCard: View {
 
 // MARK: - Shelf
 
-/// A titled horizontal row of cards. Calls `onReachEnd` when the last item appears.
+/// A titled horizontal row of cards that pages to the end: `onReachEnd` runs as its last
+/// cards come into view (see `TVLoadMoreTrigger`).
 struct TVShelf<Item: Identifiable, Card: View>: View {
     let title: String
     let items: [Item]
     var onReachEnd: (() -> Void)?
+    /// Changes whenever a page arrives (default: the item count). Pass the source's count when
+    /// `items` is filtered, so a page that added nothing visible still asks for the next one.
+    var pageKey: Int?
     /// Card width for warming the next thumbnails as the row scrolls (video rows only).
     var prefetchWidth: CGFloat?
     @ViewBuilder let card: (Item) -> Card
@@ -242,13 +246,15 @@ struct TVShelf<Item: Identifiable, Card: View>: View {
                     ForEach(items) { item in
                         card(item)
                             .onAppear {
-                                if item.id == items.last?.id { onReachEnd?() }
-                                if let prefetchWidth, let videos = items as? [Video],
-                                    let index = items.firstIndex(where: { $0.id == item.id })
-                                {
+                                guard let index = items.firstIndex(where: { $0.id == item.id }) else { return }
+                                if TVLoadMoreTrigger.isNearEnd(index, of: items.count) { onReachEnd?() }
+                                if let prefetchWidth, let videos = items as? [Video] {
                                     TVImagePipeline.prefetchThumbnails(videos, after: index, pointWidth: prefetchWidth)
                                 }
                             }
+                    }
+                    if let onReachEnd {
+                        TVLoadMoreTrigger(pageKey: pageKey ?? items.count, action: onReachEnd)
                     }
                 }
                 .padding(.horizontal, TVLayout.pageInset)
@@ -266,6 +272,8 @@ struct TVShelf<Item: Identifiable, Card: View>: View {
 struct TVVideoGrid: View {
     let videos: [Video]
     var onReachEnd: (() -> Void)?
+    /// See `TVShelf.pageKey`.
+    var pageKey: Int?
     let onSelect: (Video) -> Void
 
     private static let rowSpacing: CGFloat = 56
@@ -287,7 +295,11 @@ struct TVVideoGrid: View {
             if videos.count > eagerCount {
                 LazyVGrid(columns: TVLayout.gridColumns, alignment: .leading, spacing: Self.rowSpacing) {
                     ForEach(videos[eagerCount...]) { card($0) }
+                    loadMoreTrigger
                 }
+            } else {
+                // A short list: ask for more straight away.
+                loadMoreTrigger
             }
         }
         .padding(.horizontal, TVLayout.pageInset)
@@ -295,14 +307,44 @@ struct TVVideoGrid: View {
         .focusSection()
     }
 
+    @ViewBuilder private var loadMoreTrigger: some View {
+        if let onReachEnd {
+            TVLoadMoreTrigger(pageKey: pageKey ?? videos.count, action: onReachEnd)
+        }
+    }
+
     private func card(_ video: Video) -> some View {
         TVVideoCard(video: video, width: TVLayout.gridCardWidth) { onSelect(video) }
             .onAppear {
-                if video.id == videos.last?.id { onReachEnd?() }
-                if let index = videos.firstIndex(where: { $0.id == video.id }) {
-                    TVImagePipeline.prefetchThumbnails(videos, after: index, pointWidth: TVLayout.gridCardWidth)
-                }
+                guard let index = videos.firstIndex(where: { $0.id == video.id }) else { return }
+                if TVLoadMoreTrigger.isNearEnd(index, of: videos.count) { onReachEnd?() }
+                TVImagePipeline.prefetchThumbnails(videos, after: index, pointWidth: TVLayout.gridCardWidth)
             }
+    }
+}
+
+// MARK: - Paging
+
+/// Goes after a list's last card, inside its lazy stack: asks for the next page when it comes
+/// into view, and again each time a page arrives (`pageKey` changes) while it's still in view,
+/// so a page that added nothing visible (all Shorts, all watched) doesn't stall the list. The
+/// owner stops it by having no more pages; its "load more" ignores calls while one is loading.
+struct TVLoadMoreTrigger: View {
+    let pageKey: Int
+    let action: () -> Void
+
+    /// Cards this close to the end also ask, so the next page is usually there in time.
+    static let lookahead = 4
+
+    static func isNearEnd(_ index: Int, of count: Int) -> Bool {
+        index >= count - lookahead
+    }
+
+    var body: some View {
+        Color.clear
+            .frame(width: 1, height: 1)
+            .task(id: pageKey) { action() }
+            .accessibilityHidden(true)
     }
 }
 

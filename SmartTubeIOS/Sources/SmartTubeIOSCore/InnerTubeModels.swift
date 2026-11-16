@@ -33,6 +33,8 @@ public struct NextInfo: Sendable, Codable {
     public let chapters: [Chapter]
     /// Publish date, exact views/likes and channel info (WEB `/next` only).
     public var details: VideoDetails?
+    /// Token for the next page of related videos (`fetchMoreRelated`), nil at the end.
+    public var relatedContinuation: String?
 }
 
 // MARK: - Comment

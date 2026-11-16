@@ -72,3 +72,44 @@ struct LockupMetadataTests {
         #expect(parseCount(text) == expected)
     }
 }
+
+/// A channel's Shorts tab wraps each Short in a grid item (live shape, Nov 2026).
+@Suite("Channel Shorts tab")
+struct ChannelShortsTabTests {
+    private func short(_ id: String, _ title: String) -> [String: Any] {
+        [
+            "richItemRenderer": [
+                "content": [
+                    "shortsLockupViewModel": [
+                        "onTap": ["innertubeCommand": ["reelWatchEndpoint": ["videoId": id]]],
+                        "overlayMetadata": [
+                            "primaryText": ["content": title], "secondaryText": ["content": "3.3K views"],
+                        ],
+                    ]
+                ]
+            ]
+        ]
+    }
+
+    @Test func gridItemsAndTheirNextPage() async throws {
+        let json: [String: Any] = [
+            "contents": [
+                "richGridRenderer": [
+                    "contents": [
+                        short("s1", "First"), short("s2", "Second"),
+                        [
+                            "continuationItemRenderer": [
+                                "continuationEndpoint": ["continuationCommand": ["token": "p2"]]
+                            ]
+                        ],
+                    ]
+                ]
+            ]
+        ]
+        let group = try await InnerTubeAPI().parseVideoGroupForTesting(json, title: nil)
+        #expect(group.videos.map(\.id) == ["s1", "s2"])
+        #expect(group.videos.allSatisfy { $0.isShort })
+        #expect(group.videos.first?.viewCount == 3_300)
+        #expect(group.nextPageToken == "p2")
+    }
+}

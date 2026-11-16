@@ -337,6 +337,14 @@ extension InnerTubeAPI {
                         } else {
                             rendererMisses["richItem/lockupViewModel", default: 0] += 1
                         }
+                    } else if let shorts = content["shortsLockupViewModel"] as? [String: Any] {
+                        // A channel's Shorts tab: grid items wrap shortsLockupViewModel.
+                        if let video = parseShortsLockupViewModel(shorts) {
+                            videos.append(video)
+                            rendererHits["richItem/shortsLockupViewModel", default: 0] += 1
+                        } else {
+                            rendererMisses["richItem/shortsLockupViewModel", default: 0] += 1
+                        }
                     } else if let contItem = content["continuationItemRenderer"] as? [String: Any],
                         let endpoint = contItem["continuationEndpoint"] as? [String: Any],
                         let command = endpoint["continuationCommand"] as? [String: Any],

@@ -24,9 +24,11 @@ struct TVChannelView: View {
                     // Settings › Hide Shorts covers channel pages too.
                     let shorts = store.settings.hideShorts ? [] : vm.shorts.uniquedByID()
                     if !shorts.isEmpty {
-                        TVShelf(title: "Shorts", items: shorts) { video in
-                            TVShortCard(video: video) { navigator.play(video) }
-                        }
+                        TVShelf(
+                            title: "Shorts", items: shorts, onReachEnd: { vm.loadMoreShorts() },
+                            pageKey: vm.shorts.count,
+                            card: { video in TVShortCard(video: video) { navigator.play(video) } }
+                        )
                     }
                     if !vm.videos.isEmpty {
                         VStack(alignment: .leading, spacing: 0) {
@@ -36,6 +38,7 @@ struct TVChannelView: View {
                             TVVideoGrid(
                                 videos: vm.videos.filter { !$0.isShort }.uniquedByID(),
                                 onReachEnd: { vm.loadMore() },
+                                pageKey: vm.videos.count,
                                 onSelect: { navigator.play($0) }
                             )
                         }

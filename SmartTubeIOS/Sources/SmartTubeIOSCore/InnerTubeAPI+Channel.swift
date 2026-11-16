@@ -58,6 +58,24 @@ extension InnerTubeAPI {
         return try parseVideoGroup(from: data, title: nil)
     }
 
+    /// The channel's Shorts tab, paged like the Videos tab (its Home shelf of Shorts doesn't page).
+    public func fetchChannelShorts(channelId: String, continuationToken: String? = nil) async throws -> VideoGroup {
+        var body = makeBody(client: webClientContext, continuationToken: continuationToken)
+        if continuationToken == nil {
+            body["browseId"] = channelId
+            body["params"] = "EgZzaG9ydHPyBgUKA5oBAA=="  // "Shorts" tab parameter
+        }
+        let data = try await post(endpoint: "browse", body: body)
+        var group = try parseVideoGroup(from: data, title: nil)
+        // Everything on this tab is a Short, whatever shape YouTube sent it in.
+        group.videos = group.videos.map { video in
+            var video = video
+            video.isShort = true
+            return video
+        }
+        return group
+    }
+
     // MARK: - Private channel helpers
 
     /// Resolves a YouTube `@handle` to the canonical `UC…` channel ID using the
