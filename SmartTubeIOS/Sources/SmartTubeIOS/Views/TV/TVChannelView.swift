@@ -11,6 +11,7 @@ struct TVChannelView: View {
     @Environment(\.innerTubeAPI) private var api
     @Environment(AuthService.self) private var auth
     @Environment(TVNavigator.self) private var navigator
+    @Environment(SettingsStore.self) private var store
     @State private var vm: ChannelViewModel?
     @State private var isFollowing = false
     @Environment(\.dismiss) private var dismiss
@@ -20,8 +21,10 @@ struct TVChannelView: View {
             VStack(alignment: .leading, spacing: TVLayout.sectionSpacing) {
                 header
                 if let vm {
-                    if !vm.shorts.isEmpty {
-                        TVShelf(title: "Shorts", items: vm.shorts.uniquedByID()) { video in
+                    // Settings › Hide Shorts covers channel pages too.
+                    let shorts = store.settings.hideShorts ? [] : vm.shorts.uniquedByID()
+                    if !shorts.isEmpty {
+                        TVShelf(title: "Shorts", items: shorts) { video in
                             TVShortCard(video: video) { navigator.play(video) }
                         }
                     }
@@ -46,7 +49,7 @@ struct TVChannelView: View {
                             actionTitle: "Try Again"
                         ) { vm.load(channelId: channelId) }
                         .frame(height: 500)
-                    } else if vm.shorts.isEmpty {
+                    } else if shorts.isEmpty {
                         TVMessageView(
                             systemImage: AppSymbol.playRectangle,
                             title: "No videos",

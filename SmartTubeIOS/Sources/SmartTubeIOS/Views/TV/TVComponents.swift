@@ -17,8 +17,9 @@ enum TVLayout {
     static let cardCaptionHeight: CGFloat = 112
     /// Full-page grids: 4 fixed columns sized to fit inside the tvOS safe area.
     static let gridCardWidth: CGFloat = 360
+    static let gridColumnSpacing: CGFloat = 40
     static let gridColumns = Array(
-        repeating: GridItem(.fixed(gridCardWidth), spacing: 40, alignment: .top), count: 4)
+        repeating: GridItem(.fixed(gridCardWidth), spacing: gridColumnSpacing, alignment: .top), count: 4)
 }
 
 extension Array where Element == Video {
@@ -167,7 +168,9 @@ struct TVShortCard: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 14) {
+            // Focus enlarges the tall thumbnail by ~20 points at each edge; the gap keeps it off
+            // the caption.
+            VStack(alignment: .leading, spacing: 30) {
                 TVRemoteImage(
                     urls: [video.portraitThumbnailURL, video.thumbnailURL].compactMap { $0 },
                     pointWidth: TVLayout.shortWidth
@@ -263,21 +266,41 @@ struct TVVideoGrid: View {
     var onReachEnd: (() -> Void)?
     let onSelect: (Video) -> Void
 
+    private static let rowSpacing: CGFloat = 56
+    /// Rows built up front (see body).
+    private static let eagerRows = 2
+
     var body: some View {
-        LazyVGrid(columns: TVLayout.gridColumns, alignment: .leading, spacing: 56) {
-            ForEach(videos) { video in
-                TVVideoCard(video: video, width: TVLayout.gridCardWidth) { onSelect(video) }
-                    .onAppear {
-                        if video.id == videos.last?.id { onReachEnd?() }
-                        if let index = videos.firstIndex(where: { $0.id == video.id }) {
-                            TVImagePipeline.prefetchThumbnails(videos, after: index, pointWidth: TVLayout.gridCardWidth)
-                        }
-                    }
+        let columns = TVLayout.gridColumns.count
+        let eagerCount = min(videos.count, columns * Self.eagerRows)
+        VStack(alignment: .leading, spacing: Self.rowSpacing) {
+            // The first rows are built up front: a lazy grid only builds rows once they're on
+            // screen, so with something tall above it (a channel's Shorts shelf) the first row
+            // could sit just below the screen — and focus, finding nothing below, got stuck.
+            ForEach(Array(stride(from: 0, to: eagerCount, by: columns)), id: \.self) { start in
+                HStack(alignment: .top, spacing: TVLayout.gridColumnSpacing) {
+                    ForEach(videos[start..<min(start + columns, eagerCount)]) { card($0) }
+                }
+            }
+            if videos.count > eagerCount {
+                LazyVGrid(columns: TVLayout.gridColumns, alignment: .leading, spacing: Self.rowSpacing) {
+                    ForEach(videos[eagerCount...]) { card($0) }
+                }
             }
         }
         .padding(.horizontal, TVLayout.pageInset)
         .padding(.vertical, 24)
         .focusSection()
+    }
+
+    private func card(_ video: Video) -> some View {
+        TVVideoCard(video: video, width: TVLayout.gridCardWidth) { onSelect(video) }
+            .onAppear {
+                if video.id == videos.last?.id { onReachEnd?() }
+                if let index = videos.firstIndex(where: { $0.id == video.id }) {
+                    TVImagePipeline.prefetchThumbnails(videos, after: index, pointWidth: TVLayout.gridCardWidth)
+                }
+            }
     }
 }
 
