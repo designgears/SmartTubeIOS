@@ -156,6 +156,8 @@ enum AppSymbol {
     static let audioOnly = "waveform.circle"
     static let hide = "eye.slash"
     static let views = "eye"
+    static let sponsorBlock = "forward.end.alt"
+    static let excludedChannel = "person.crop.circle.badge.minus"
 
     // MARK: - Status / info
     static let warning = "exclamationmark.triangle.fill"

@@ -67,6 +67,7 @@ struct SectionsSettingsView: View {
                 }
             }
         }
+        .settingsPage(symbol: AppSymbol.sortOrder, caption: "Choose and order the sections in the tab bar.")
         .navigationTitle("Visible Sections")
         #if os(iOS)
         .toolbar(.visible, for: .navigationBar)

@@ -70,6 +70,7 @@ struct SponsorBlockSettingsView: View {
                 .accessibilityIdentifier(AccessibilityID.Settings.sponsorBlockExcludedChannels)
             }
         }
+        .settingsPage(symbol: AppSymbol.sponsorBlock, caption: "What to do with each kind of segment.")
         .navigationTitle("SponsorBlock")
         #if os(tvOS)
         .pickerStyle(.menu)
@@ -132,7 +133,7 @@ struct SponsorBlockExcludedChannelsView: View {
             if sortedChannels.isEmpty {
                 ContentUnavailableView(
                     "No Excluded Channels",
-                    systemImage: "person.crop.circle.badge.minus",
+                    systemImage: AppSymbol.excludedChannel,
                     description: Text(
                         "Open a channel and tap \u{201C}Exclude from SponsorBlock\u{201D} to add it here.")
                 )
@@ -163,6 +164,7 @@ struct SponsorBlockExcludedChannelsView: View {
                 }
             }
         }
+        .settingsPage(symbol: AppSymbol.excludedChannel, caption: "SponsorBlock leaves these channels' videos alone.")
         .navigationTitle("Excluded Channels")
         #if os(iOS)
         .toolbar(.visible, for: .navigationBar)

@@ -109,6 +109,10 @@ struct AccountsSettingsView: View {
                 Text("Signing out of an account removes all of its channels from this device.")
             }
         }
+        .settingsPage(
+            imageURL: auth.isSignedIn ? auth.accountAvatarURL : nil, fallbackSymbol: AppSymbol.accountsFill,
+            caption: "Switch profiles, add an account, or sign out."
+        )
         .navigationTitle("Accounts")
         #if os(iOS)
         .toolbar(.visible, for: .navigationBar)

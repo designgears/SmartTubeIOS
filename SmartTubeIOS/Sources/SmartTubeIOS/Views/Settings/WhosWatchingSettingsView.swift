@@ -31,6 +31,7 @@ struct WhosWatchingSettingsView: View {
                         + "The profile in use is always shown.")
             }
         }
+        .settingsPage(symbol: AppSymbol.accountsFill, caption: "Choose who appears on the Who's Watching? screen.")
         .navigationTitle("Who's Watching")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
