@@ -89,3 +89,32 @@ struct LiveNowTests {
         #expect(!InnerTubeAPI.isLiveNow(nil))
     }
 }
+
+@Suite("Live — HLS variants")
+struct LiveVariantTests {
+    /// Trimmed from a real YouTube live multivariant playlist (Lofi Girl).
+    private let live = """
+        #EXTM3U
+        #EXT-X-INDEPENDENT-SEGMENTS
+        #EXT-X-STREAM-INF:BANDWIDTH=269034,CODECS="mp4a.40.5,avc1.42C00B",RESOLUTION=256x144,FRAME-RATE=15
+        https://manifest.googlevideo.com/api/manifest/hls_playlist/id/x.1/itag/91/source/yt_live_broadcast/live/1/a
+        #EXT-X-STREAM-INF:BANDWIDTH=410000,CODECS="mp4a.40.5,avc1.4D4015",RESOLUTION=426x240,FRAME-RATE=30
+        https://manifest.googlevideo.com/api/manifest/hls_playlist/id/x.1/itag/92/source/yt_live_broadcast/live/1/b
+        #EXT-X-STREAM-INF:BANDWIDTH=1000000,CODECS="mp4a.40.2,avc1.4D401E",RESOLUTION=640x360,FRAME-RATE=30
+        https://manifest.googlevideo.com/api/manifest/hls_playlist/id/x.1/itag/93/source/yt_live_broadcast/live/1/c
+        #EXT-X-STREAM-INF:BANDWIDTH=5000000,CODECS="mp4a.40.2,avc1.640028",RESOLUTION=1920x1080,FRAME-RATE=30
+        https://manifest.googlevideo.com/api/manifest/hls_playlist/id/x.1/itag/96/source/yt_live_broadcast/live/1/d
+        """
+
+    @Test func liveKeepsTheVariantsMatchingTheBest() {
+        let result = consistentLiveVariants(live)
+        #expect(hlsMultivariantPlaylistURIs(result).map { String($0.suffix(1)) } == ["c", "d"])
+        #expect(!result.contains("RESOLUTION=256x144"))
+        #expect(!result.contains("RESOLUTION=426x240"))
+    }
+
+    @Test func videosAreUntouched() {
+        let video = live.replacingOccurrences(of: "source/yt_live_broadcast/live/1/", with: "source/youtube/")
+        #expect(consistentLiveVariants(video) == video)
+    }
+}

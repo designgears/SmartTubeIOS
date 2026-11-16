@@ -44,7 +44,8 @@ extension PlaybackViewModel {
     }
 
     var effectivePlaybackSpeed: Double {
-        if isCurrentVideoMusic { return 1.0 }
+        // Live can't run faster than it's broadcast: above 1× it only hits the live edge.
+        if isCurrentVideoMusic || isLive { return 1.0 }
         if let channel = speedMemoryChannelId, let speed = settings.channelPlaybackSpeeds[channel] {
             return speed
         }
@@ -70,7 +71,7 @@ extension PlaybackViewModel {
     public func userSelectedPlaybackSpeed(_ speed: Double) -> PlaybackSpeedScope {
         settings.playbackSpeed = speed
         setPlaybackSpeed(speed)
-        if isCurrentVideoMusic { return .sessionOnly }
+        if isCurrentVideoMusic || isLive { return .sessionOnly }
         if let channel = speedMemoryChannelId {
             settings.channelPlaybackSpeeds[channel] = speed
             return .channel(channel)

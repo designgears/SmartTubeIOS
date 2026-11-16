@@ -352,7 +352,9 @@ final class YTHLSProxyLoader: NSObject, AVAssetResourceLoaderDelegate, @unchecke
         // Step 1: Replace unsolved n-challenge across the entire playlist text.
         // The n-value is identical in all URLs for a given session, so a global
         // string replacement is safe and avoids per-URL regex overhead.
-        var text = m3u8
+        // Live masters keep one audio codec and frame rate across the ladder, or the video
+        // drifts behind the audio (anything else comes back unchanged).
+        var text = consistentLiveVariants(m3u8)
         if let (unsolved, solved) = nSolver, !unsolved.isEmpty, unsolved != solved {
             let oldN = "/n/\(unsolved)/"
             let newN = "/n/\(solved)/"

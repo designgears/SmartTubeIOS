@@ -31,6 +31,7 @@ struct TVPlayerScreen: View {
                     vm: vm, state: menuState(vm), actions: actions(vm), fallbackVideo: video,
                     fillsScreen: store.settings.videoGravityMode == .fill,
                     segments: vm.sponsorSegments, duration: vm.duration, liveColor: AppColor.live(store),
+                    isLive: vm.isLive,
                     transportBar: transportBar
                 )
                 .ignoresSafeArea()
@@ -197,10 +198,17 @@ struct TVNativePlayer: UIViewControllerRepresentable {
     var duration: TimeInterval = 0
     /// Settings › Colors › Live, for AVKit's own LIVE tags.
     var liveColor: Color
+    /// Live streams keep the TV's display mode (see `matchesDisplayMode`).
+    var isLive = false
     /// What the player is showing, for the overlays drawn on top of it.
     var transportBar: TVPlayerPresentationState?
 
     func makeCoordinator() -> Coordinator { Coordinator() }
+
+    /// Videos switch the TV to their frame rate and dynamic range. Live streams don't: a live
+    /// ladder can change frame rate mid-stream, and each switch stalls the picture while the
+    /// audio carries on.
+    static func matchesDisplayMode(isLive: Bool) -> Bool { !isLive }
 
     func makeUIViewController(context: Context) -> AVPlayerViewController {
         let pvc = AVPlayerViewController()
@@ -208,7 +216,7 @@ struct TVNativePlayer: UIViewControllerRepresentable {
         // Speed is offered through our own menu so it persists in settings.
         pvc.speeds = []
         // Match the TV's frame rate / dynamic range to the content.
-        pvc.appliesPreferredDisplayCriteriaAutomatically = true
+        pvc.appliesPreferredDisplayCriteriaAutomatically = Self.matchesDisplayMode(isLive: isLive)
         pvc.videoGravity = fillsScreen ? .resizeAspectFill : .resizeAspect
         context.coordinator.transportBar = transportBar
         pvc.delegate = context.coordinator
@@ -224,6 +232,10 @@ struct TVNativePlayer: UIViewControllerRepresentable {
         context.coordinator.apply(state: state)
         let gravity: AVLayerVideoGravity = fillsScreen ? .resizeAspectFill : .resizeAspect
         if pvc.videoGravity != gravity { pvc.videoGravity = gravity }
+        let matching = Self.matchesDisplayMode(isLive: isLive)
+        if pvc.appliesPreferredDisplayCriteriaAutomatically != matching {
+            pvc.appliesPreferredDisplayCriteriaAutomatically = matching
+        }
         context.coordinator.liveBadgeTint.color = UIColor(liveColor)
         context.coordinator.updateSegmentStrip(segments: segments, duration: duration)
     }
