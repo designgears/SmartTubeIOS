@@ -49,7 +49,7 @@ extension Video {
 
 /// How much of each video this profile has seen: the most watched here (kept past the end,
 /// which `VideoStateStore` forgets) and the progress YouTube's watch history reports. Per
-/// account — swapped by `AccountScope`.
+/// account — swapped by `AccountScope` — and kept in a file per account (`WatchedStoreFile`).
 @MainActor
 @Observable
 public final class WatchedStore {
@@ -60,18 +60,35 @@ public final class WatchedStore {
         var history: Double?
     }
 
-    static let defaultsKey = "st_watched"
-    static let maxEntries = 3_000
+    /// Where this data lived in UserDefaults before it moved to a file (migrated on load).
+    static let legacyDefaultsKey = "st_watched"
+    /// Enough for a long YouTube history; the oldest entries go beyond it.
+    static let maxEntries = 60_000
+    /// Coalesces the writes of a run of changes (history pages, playback checkpoints).
+    static let writeDelay: Duration = .seconds(2)
 
     private(set) var entries: [String: Entry] = [:]
+    /// The account's full-history read (`WatchedHistorySync`).
+    public private(set) var backfill = HistoryBackfill.notStarted
     /// Ids oldest-first, for dropping the oldest beyond `maxEntries`.
     @ObservationIgnored private var order: [String] = []
+    /// Whose data is live (an `AccountScope` slot); nil before the first account activation.
+    @ObservationIgnored private var slot: String?
     @ObservationIgnored private let defaults: UserDefaults
+    @ObservationIgnored private let file: WatchedStoreFile
+    @ObservationIgnored private var pendingWrite: Task<Void, Never>?
 
-    public init(defaults: UserDefaults = .standard) {
+    public init(
+        defaults: UserDefaults = .standard, directory: URL? = nil,
+        slot: String? = AccountScope.currentSlot
+    ) {
         self.defaults = defaults
-        load(defaults.data(forKey: Self.defaultsKey))
+        self.file = WatchedStoreFile(directory: directory ?? WatchedStoreFile.defaultDirectory)
+        self.slot = slot
+        if let slot { load(slot, isLive: true) }
     }
+
+    public var isFull: Bool { entries.count >= Self.maxEntries }
 
     // MARK: Reading
 
@@ -81,7 +98,7 @@ public final class WatchedStore {
     }
 
     /// The most of `video` seen — here, in the account's history, or on the item's own resume
-    /// bar — for the red bar on its card. Nil when nothing has been seen.
+    /// bar — for the bar on its card. Nil when nothing has been seen.
     public func progress(for video: Video) -> Double? {
         let entry = entries[video.id]
         let seen = [entry?.local, entry?.history, video.watchProgress].compactMap { $0 }.max() ?? 0
@@ -101,37 +118,68 @@ public final class WatchedStore {
         let fraction = min(position / duration, 1)
         guard fraction > (entries[videoId]?.local ?? 0) else { return }
         update(videoId) { $0.local = fraction }
-        persist()
+        scheduleWrite()
     }
 
-    /// YouTube's progress for videos in the account's watch history.
-    public func absorbHistory(_ videos: [Video]) {
-        var changed = false
+    /// Videos from the account's watch history, with YouTube's progress where it shows one.
+    /// Returns how many were new or changed — zero once the history reaches what's known.
+    @discardableResult
+    public func absorbHistory(_ videos: [Video]) -> Int {
+        var changed = 0
         for video in videos {
-            guard let progress = video.watchProgress, progress > 0, progress != entries[video.id]?.history else {
-                continue
-            }
+            // No resume bar (some live streams, Shorts): known, with nothing seen to show.
+            let progress = video.watchProgress ?? 0
+            let known = entries[video.id]?.history
+            guard known == nil || (progress > 0 && progress != known) else { continue }
             update(video.id) { $0.history = progress }
-            changed = true
+            changed += 1
         }
-        if changed { persist() }
+        if changed > 0 { scheduleWrite() }
+        return changed
+    }
+
+    func updateBackfill(_ progress: HistoryBackfill) {
+        guard progress != backfill else { return }
+        backfill = progress
+        scheduleWrite()
     }
 
     // MARK: Accounts
 
-    /// Account switch (see `AccountScope`): park the live data, load the incoming account's.
+    /// Account switch (see `AccountScope`): save the live data, load the incoming account's.
+    /// From no account (first run) the live data isn't anybody's, so it's dropped.
     public func switchAccountData(from outgoing: String?, to incoming: String) {
-        let saved = AccountScope.exchange(
-            key: Self.defaultsKey, current: encoded(), outgoing: outgoing, incoming: incoming, defaults: defaults)
-        load(saved as? Data)
-        persist()
+        if let outgoing {
+            slot = outgoing
+            flush()
+        }
+        pendingWrite?.cancel()
+        slot = incoming
+        load(incoming, isLive: false)
+    }
+
+    /// A removed account's data (see `AccountScope.forget`).
+    public func forget(accountId: String) {
+        file.remove(accountId: accountId, keeping: slot)
     }
 
     // MARK: Storage
 
-    private struct Stored: Codable {
-        var id: String
-        var entry: Entry
+    /// Writes now rather than after `writeDelay` (account switch, tests).
+    public func flush() {
+        pendingWrite?.cancel()
+        pendingWrite = nil
+        guard let slot else { return }
+        file.write(contents(), for: slot)
+    }
+
+    private func scheduleWrite() {
+        guard pendingWrite == nil else { return }
+        pendingWrite = Task { [weak self] in
+            try? await Task.sleep(for: Self.writeDelay)
+            guard !Task.isCancelled else { return }
+            self?.flush()
+        }
     }
 
     private func update(_ videoId: String, _ change: (inout Entry) -> Void) {
@@ -146,18 +194,53 @@ public final class WatchedStore {
         }
     }
 
-    private func encoded() -> Data? {
-        try? JSONEncoder().encode(order.compactMap { id in entries[id].map { Stored(id: id, entry: $0) } })
+    private func contents() -> WatchedStoreFile.Contents {
+        var contents = WatchedStoreFile.Contents(backfill: backfill)
+        for id in order {
+            guard let entry = entries[id] else { continue }
+            contents.ids.append(id)
+            contents.local.append(entry.local)
+            contents.history.append(entry.history)
+        }
+        return contents
     }
 
-    private func load(_ data: Data?) {
-        let stored = data.flatMap { try? JSONDecoder().decode([Stored].self, from: $0) } ?? []
-        entries = Dictionary(stored.map { ($0.id, $0.entry) }, uniquingKeysWith: { _, last in last })
-        order = stored.map(\.id)
+    private func load(_ slot: String, isLive: Bool) {
+        let contents = file.read(slot) ?? migrateLegacy(slot, isLive: isLive) ?? WatchedStoreFile.Contents()
+        var loaded: [String: Entry] = [:]
+        var ids: [String] = []
+        for (index, id) in contents.ids.enumerated() where loaded[id] == nil {
+            loaded[id] = Entry(
+                local: contents.local.indices.contains(index) ? contents.local[index] : nil,
+                history: contents.history.indices.contains(index) ? contents.history[index] : nil)
+            ids.append(id)
+        }
+        entries = loaded
+        order = ids
+        backfill = contents.backfill
     }
 
-    private func persist() {
-        if let data = encoded() { defaults.set(data, forKey: Self.defaultsKey) }
+    /// Data saved before the file: a parked account's under its `AccountScope` slot key, and
+    /// the account live at launch under the plain key. Moved into the file, then removed.
+    private func migrateLegacy(_ slot: String, isLive: Bool) -> WatchedStoreFile.Contents? {
+        struct Stored: Codable {
+            var id: String
+            var entry: Entry
+        }
+        let parkedKey = AccountScope.slotKey(Self.legacyDefaultsKey, slot: slot)
+        let key = defaults.data(forKey: parkedKey) != nil || !isLive ? parkedKey : Self.legacyDefaultsKey
+        guard let data = defaults.data(forKey: key),
+            let stored = try? JSONDecoder().decode([Stored].self, from: data)
+        else { return nil }
+        var contents = WatchedStoreFile.Contents()
+        for item in stored {
+            contents.ids.append(item.id)
+            contents.local.append(item.entry.local)
+            contents.history.append(item.entry.history)
+        }
+        file.write(contents, for: slot)
+        defaults.removeObject(forKey: key)
+        return contents
     }
 }
 

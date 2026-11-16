@@ -126,6 +126,8 @@ struct TVHomeView: View {
             playerWasOpen = false
             // In place: Continue Watching keeps its cards until the refreshed list arrives.
             historyVM?.refreshInPlace()
+            // What was watched elsewhere since (phone, web), for the bars on every card.
+            if isSignedIn { WatchedHistorySync.shared.syncIfDue(api: api) }
         }
         // Also re-read when the player closes: watching a removed video again brings it back.
         .task(

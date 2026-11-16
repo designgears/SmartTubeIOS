@@ -328,6 +328,8 @@ public final class BrowseViewModel {
         hasAuthToken = token != nil
         await api.setAuthToken(token)
         if token != nil {
+            // The account's YouTube history, for what's been watched (throttled per account).
+            WatchedHistorySync.shared.syncIfDue(api: api)
             // Signed in — load. A new token while already signed in is the same account's
             // periodic refresh: reloading would blank the page and lose the scroll position.
             // (An account or channel switch reloads via AccountScope.didChangeNotification.)

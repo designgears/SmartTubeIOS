@@ -88,7 +88,9 @@ public enum AccountScope {
     }
 
     /// Deletes a removed account's parked data — every channel profile of it.
+    @MainActor
     public static func forget(_ accountId: String, defaults: UserDefaults = .standard) {
+        WatchedStore.shared.forget(accountId: accountId)
         let live = defaults.string(forKey: currentSlotKey)
         let exact = "#account.\(accountId)"
         let channelPrefix = "#account.\(accountId).channel."

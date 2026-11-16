@@ -26,6 +26,8 @@ final class MockInnerTubeAPI: InnerTubeAPIProtocol {
     var homeRowsResult: [VideoGroup] = []
     var subscriptionsResult: VideoGroup = VideoGroup(title: "Subs", videos: [])
     var historyResult: VideoGroup = VideoGroup(title: "History", videos: [])
+    /// When set, answers each history page by its continuation token (nil = first page).
+    var historyHandler: ((String?) -> VideoGroup)?
     var shortsResult: VideoGroup = VideoGroup(title: "Shorts", videos: [])
     var shortsMoreResult: VideoGroup = VideoGroup(title: "Shorts", videos: [])
     /// When set, overrides `shortsMoreResult` and is called for each
@@ -84,7 +86,7 @@ final class MockInnerTubeAPI: InnerTubeAPIProtocol {
     func fetchHistory(continuationToken: String?) async throws -> VideoGroup {
         calls.append(Call(method: "fetchHistory", args: [continuationToken ?? "nil"]))
         if let e = errorToThrow { throw e }
-        return historyResult
+        return historyHandler?(continuationToken) ?? historyResult
     }
 
     func fetchShorts() async throws -> VideoGroup {

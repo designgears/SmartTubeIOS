@@ -56,10 +56,19 @@ struct WatchedPolicyTests {
 struct WatchedStoreTests {
     private let policy = WatchedPolicy(threshold: 0.9, includesMusic: false, usesYouTubeHistory: true)
 
-    private func makeStore() -> (WatchedStore, UserDefaults) {
+    private struct Place {
         // swiftlint:disable:next force_unwrapping
         let defaults = UserDefaults(suiteName: "watched-\(UUID().uuidString)")!  // a fresh suite name always works
-        return (WatchedStore(defaults: defaults), defaults)
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("watched-\(UUID().uuidString)")
+
+        @MainActor func store(slot: String = "A") -> WatchedStore {
+            WatchedStore(defaults: defaults, directory: directory, slot: slot)
+        }
+    }
+
+    private func makeStore() -> (WatchedStore, Place) {
+        let place = Place()
+        return (place.store(), place)
     }
 
     private func video(_ id: String) -> Video { Video(id: id, title: id, channelTitle: "Channel") }
@@ -106,19 +115,64 @@ struct WatchedStoreTests {
     }
 
     @Test func survivesRelaunch() {
-        let (store, defaults) = makeStore()
+        let (store, place) = makeStore()
         store.record(videoId: "a", position: 600, duration: 600)
-        #expect(WatchedStore(defaults: defaults).isWatched(video("a"), policy: policy))
+        store.updateBackfill(HistoryBackfill(token: "page7", isComplete: false))
+        store.flush()
+        let relaunched = place.store()
+        #expect(relaunched.isWatched(video("a"), policy: policy))
+        #expect(relaunched.backfill == HistoryBackfill(token: "page7", isComplete: false))
     }
 
     @Test func eachAccountHasItsOwn() {
-        let (store, defaults) = makeStore()
+        let (store, _) = makeStore()
         store.record(videoId: "a", position: 600, duration: 600)
         store.switchAccountData(from: "A", to: "B")
         #expect(!store.isWatched(video("a"), policy: policy))
         store.switchAccountData(from: "B", to: "A")
         #expect(store.isWatched(video("a"), policy: policy))
-        _ = defaults
+    }
+
+    /// Data saved in UserDefaults before the file: the live account's, and a parked one's.
+    @Test func movesOldDataOutOfUserDefaults() throws {
+        let place = Place()
+        let old = Data(#"[{"id":"a","entry":{"local":1}}]"#.utf8)
+        place.defaults.set(old, forKey: "st_watched")
+        place.defaults.set(Data(#"[{"id":"b","entry":{"history":1}}]"#.utf8), forKey: "st_watched#account.B")
+        let store = place.store(slot: "A")
+        #expect(store.isWatched(video("a"), policy: policy))
+        #expect(place.defaults.data(forKey: "st_watched") == nil)
+        store.switchAccountData(from: "A", to: "B")
+        #expect(store.isWatched(video("b"), policy: policy))
+        #expect(place.defaults.data(forKey: "st_watched#account.B") == nil)
+    }
+
+    /// The live UserDefaults data belonged to whoever was live at launch, nobody else.
+    @Test func oldLiveDataStaysWithTheLiveAccount() {
+        let place = Place()
+        place.defaults.set(Data(#"[{"id":"a","entry":{"local":1}}]"#.utf8), forKey: "st_watched")
+        let store = place.store(slot: "A")
+        store.switchAccountData(from: "A", to: "C")
+        #expect(!store.isWatched(video("a"), policy: policy))
+    }
+
+    @Test func forgettingAnAccountDeletesItsData() {
+        let (store, place) = makeStore()
+        store.record(videoId: "a", position: 600, duration: 600)
+        store.switchAccountData(from: "A", to: "B")
+        store.forget(accountId: "A")
+        store.switchAccountData(from: "B", to: "A")
+        #expect(!store.isWatched(video("a"), policy: policy))
+        _ = place
+    }
+
+    /// History videos without a resume bar still count as known, so a sync can tell where the
+    /// history it already has begins.
+    @Test func historyWithoutProgressIsKnownButNotWatched() {
+        let (store, _) = makeStore()
+        #expect(store.absorbHistory([video("live")]) == 1)
+        #expect(store.absorbHistory([video("live")]) == 0)
+        #expect(store.progress(for: video("live")) == nil)
     }
 }
 
