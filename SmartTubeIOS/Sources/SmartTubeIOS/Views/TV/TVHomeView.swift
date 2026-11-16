@@ -58,7 +58,6 @@ struct TVHomeView: View {
                         TVVideoCard(video: video, removal: continueWatchingRemoval(video)) {
                             navigator.play(video)
                         }
-                        .environment(\.dimsWatchedVideos, false)
                     }
                 }
 

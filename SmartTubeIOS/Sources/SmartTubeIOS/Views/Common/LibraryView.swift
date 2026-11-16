@@ -178,8 +178,6 @@ public struct LibraryView: View {
                                 }
                             }
                         )
-                        // History is all watched by definition: no point fading it.
-                        .environment(\.dimsWatchedVideos, selectedSection != .history)
                         // Offset restorer — always present; no-op when restoreOffset is nil.
                         #if os(iOS) || os(tvOS)
                         ScrollOffsetRestorer(targetOffset: restoreOffset) {

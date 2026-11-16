@@ -82,6 +82,23 @@ struct WatchedStoreTests {
         #expect(!store.isWatched(video("b"), policy: localOnly))
     }
 
+    /// The card's red bar: the most seen anywhere — a finished video keeps a full bar, and a
+    /// feed item learns its progress from the account's history.
+    @Test func progressIsTheMostSeenAnywhere() {
+        let (store, _) = makeStore()
+        #expect(store.progress(for: video("a")) == nil)
+        store.record(videoId: "a", position: 600, duration: 600)
+        #expect(store.progress(for: video("a")) == 1)
+
+        var fromHistory = video("b")
+        fromHistory.watchProgress = 0.4
+        store.absorbHistory([fromHistory])
+        #expect(store.progress(for: video("b")) == 0.4)  // a bare feed item with the same id
+        var withBar = video("b")
+        withBar.watchProgress = 0.7
+        #expect(store.progress(for: withBar) == 0.7)
+    }
+
     @Test func unwatchedKeepsOrder() {
         let (store, _) = makeStore()
         store.record(videoId: "b", position: 600, duration: 600)
@@ -111,7 +128,6 @@ struct WatchedStoreTests {
 struct WatchedSettingsTests {
     @Test func defaults() {
         let settings = AppSettings()
-        #expect(settings.dimWatchedVideos)
         #expect(settings.hideWatchedInFeeds)
         #expect(settings.skipWatchedWhenPlayingNext)
         #expect(settings.hideWatchedThreshold == 0.9)

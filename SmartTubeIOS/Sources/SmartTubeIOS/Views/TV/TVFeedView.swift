@@ -64,7 +64,6 @@ struct TVFeedView: View {
                 pageKey: vm.videoGroups.flatMap(\.videos).count,
                 onSelect: { navigator.play($0) }
             )
-            .environment(\.dimsWatchedVideos, type != .history)
         } else if vm == nil || vm?.isLoading == true {
             TVLoadingView().frame(height: 700)
         } else if needsSignIn {

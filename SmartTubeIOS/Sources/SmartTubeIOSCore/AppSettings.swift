@@ -61,8 +61,6 @@ public struct AppSettings: Codable {
     /// Loads 1280×720 CDN thumbnails instead of the smaller API-provided ones.
     public var highResThumbnails: Bool
     // MARK: Watched videos (see `WatchedPolicy`)
-    /// Fades watched videos' cards.
-    public var dimWatchedVideos: Bool
     /// Leaves watched videos out of Home, Subscriptions and Explore. History and Continue
     /// Watching are never filtered — watched videos are their point.
     public var hideWatchedInFeeds: Bool
@@ -301,7 +299,6 @@ public struct AppSettings: Codable {
         defaultSection = BrowseSection.SectionType.home.rawValue
         compactThumbnails = false
         highResThumbnails = false
-        dimWatchedVideos = true
         hideWatchedInFeeds = true
         skipWatchedWhenPlayingNext = true
         hideWatchedThreshold = 0.9
@@ -398,7 +395,6 @@ extension AppSettings {
         case defaultSection
         case compactThumbnails
         case highResThumbnails
-        case dimWatchedVideos
         case hideWatchedInFeeds
         case skipWatchedWhenPlayingNext
         case hideWatchedThreshold
@@ -472,7 +468,6 @@ extension AppSettings {
         defaultSection = c.safeDecode(String.self, forKey: .defaultSection, default: d.defaultSection)
         compactThumbnails = c.safeDecode(Bool.self, forKey: .compactThumbnails, default: d.compactThumbnails)
         highResThumbnails = c.safeDecode(Bool.self, forKey: .highResThumbnails, default: d.highResThumbnails)
-        dimWatchedVideos = c.safeDecode(Bool.self, forKey: .dimWatchedVideos, default: d.dimWatchedVideos)
         hideWatchedInFeeds = c.safeDecode(Bool.self, forKey: .hideWatchedInFeeds, default: d.hideWatchedInFeeds)
         skipWatchedWhenPlayingNext = c.safeDecode(
             Bool.self, forKey: .skipWatchedWhenPlayingNext, default: d.skipWatchedWhenPlayingNext)

@@ -16,7 +16,6 @@ enum AccessibilityID {
         static let hideShortsToggle = "settings.hideShortsToggle"
         static let hideVideoPremieresToggle = "settings.hideVideoPremieresToggle"
         static let watchedThresholdRow = "settings.watchedThresholdRow"
-        static let dimWatchedToggle = "settings.dimWatchedToggle"
         static let hideWatchedInFeedsToggle = "settings.hideWatchedInFeedsToggle"
         static let skipWatchedToggle = "settings.skipWatchedToggle"
         static let watchedIncludesMusicToggle = "settings.watchedIncludesMusicToggle"

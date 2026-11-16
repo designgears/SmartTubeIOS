@@ -35,7 +35,8 @@ extension Array where Element == Video {
 struct TVVideoThumbnail: View {
     let video: Video
     var showsBadges = true
-    /// Watched fraction to draw as the red bar. Defaults to YouTube's own resume progress.
+    /// Watched fraction to draw as the red bar (the saved resume position). Without one, the
+    /// most seen here or on YouTube (`WatchedStore`), so finished videos keep a full bar.
     var progress: Double?
     /// On-screen width, so the thumbnail is downsampled to the size actually shown.
     var pointWidth: CGFloat = TVLayout.cardWidth
@@ -50,7 +51,7 @@ struct TVVideoThumbnail: View {
             TVRemoteImage(urls: Self.urls(for: video), pointWidth: pointWidth)
 
             if showsBadges {
-                if let progress = progress ?? video.watchProgress, progress > 0.02 {
+                if let progress = progress ?? WatchedStore.shared.progress(for: video), progress > 0.02 {
                     GeometryReader { geo in
                         VStack {
                             Spacer()
@@ -119,7 +120,6 @@ struct TVVideoCard: View {
                 TVVideoCaption(video: video)
                     .frame(width: width, height: TVLayout.cardCaptionHeight, alignment: .topLeading)
             }
-            .dimmedIfWatched(video)
         }
         .buttonStyle(.borderless)
         .contextMenu { TVVideoContextMenu(video: video, removal: removal) }
@@ -182,7 +182,6 @@ struct TVShortCard: View {
                 TVVideoCaption(video: video, titleFont: .caption.weight(.semibold), showsChannel: false)
                     .frame(width: TVLayout.shortWidth, height: 64, alignment: .topLeading)
             }
-            .dimmedIfWatched(video)
         }
         .buttonStyle(.borderless)
         .contextMenu { TVVideoContextMenu(video: video) }

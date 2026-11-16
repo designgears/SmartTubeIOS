@@ -80,6 +80,14 @@ public final class WatchedStore {
         return policy.isWatched(video, localFraction: entry?.local, historyFraction: entry?.history)
     }
 
+    /// The most of `video` seen — here, in the account's history, or on the item's own resume
+    /// bar — for the red bar on its card. Nil when nothing has been seen.
+    public func progress(for video: Video) -> Double? {
+        let entry = entries[video.id]
+        let seen = [entry?.local, entry?.history, video.watchProgress].compactMap { $0 }.max() ?? 0
+        return seen > 0 ? min(seen, 1) : nil
+    }
+
     /// `videos` without the watched ones, in order.
     public func unwatched(_ videos: [Video], policy: WatchedPolicy) -> [Video] {
         videos.filter { !isWatched($0, policy: policy) }

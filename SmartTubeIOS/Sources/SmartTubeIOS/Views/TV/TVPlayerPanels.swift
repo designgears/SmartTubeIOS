@@ -30,7 +30,6 @@ struct TVUpNextPanel: View {
                                 TVVideoCaption(video: video, titleFont: .caption.weight(.semibold))
                                     .frame(width: 340, height: 96, alignment: .topLeading)
                             }
-                            .dimmedIfWatched(video, settings: vm.settings)
                         }
                         .buttonStyle(.borderless)
                         .onAppear {

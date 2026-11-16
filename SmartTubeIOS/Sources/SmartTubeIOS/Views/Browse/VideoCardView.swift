@@ -54,7 +54,7 @@ public struct VideoCardView: View {
     #endif
 
     private var effectiveProgress: Double? {
-        localProgress ?? video.watchProgress
+        localProgress ?? WatchedStore.shared.progress(for: video)
     }
 
     /// #125: falls back to `video.playlistId` when the caller doesn't explicitly pass
@@ -84,7 +84,6 @@ public struct VideoCardView: View {
                 gridLayout
             }
         }
-        .dimmedIfWatched(video)
         .task {
             localProgress = await VideoStateStore.shared.state(for: video.id)?.watchedFraction
         }

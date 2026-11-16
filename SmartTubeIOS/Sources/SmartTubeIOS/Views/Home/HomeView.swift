@@ -305,8 +305,6 @@ public struct HomeView: View {
         } else {
             sectionFeed
                 .accessibilityIdentifier("home.sectionContainer")
-                // History is all watched by definition: no point fading it.
-                .environment(\.dimsWatchedVideos, selectedSection.type != .history)
         }
     }
 

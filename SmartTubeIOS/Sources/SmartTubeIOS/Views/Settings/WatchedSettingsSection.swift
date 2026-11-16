@@ -10,8 +10,6 @@ struct WatchedSettingsSection: View {
     var body: some View {
         @Bindable var store = store
         Section {
-            Toggle("Dim Watched Videos", isOn: $store.settings.dimWatchedVideos)
-                .accessibilityIdentifier(AccessibilityID.Settings.dimWatchedToggle)
             Toggle("Hide in Feeds", isOn: $store.settings.hideWatchedInFeeds)
                 .accessibilityIdentifier(AccessibilityID.Settings.hideWatchedInFeedsToggle)
             Toggle("Skip When Playing Next", isOn: $store.settings.skipWatchedWhenPlayingNext)
@@ -27,7 +25,7 @@ struct WatchedSettingsSection: View {
             Text(
                 "Hide in Feeds covers Home, Subscriptions and Explore. Skip When Playing Next covers autoplay, "
                     + "Next, queues and playlists. History and Continue Watching are left as they are, and music "
-                    + "is never dimmed or skipped unless Include Music is on.")
+                    + "is never hidden or skipped unless Include Music is on. Watched videos show a red bar.")
         }
     }
 
