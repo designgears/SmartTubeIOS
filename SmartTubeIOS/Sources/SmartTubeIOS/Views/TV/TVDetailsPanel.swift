@@ -77,6 +77,12 @@ struct TVDetailsPanel: View {
     /// "Nov 15, 2026" over "9 hours ago" when the watch page is in; the card's age until then.
     private func published(_ video: Video?, _ details: VideoDetails?) -> (value: String, label: String)? {
         if let date = details?.dateText {
+            // Streams read "Started streaming on Nov 3, 2026" / "Streamed live on …": the date
+            // goes in the value, the rest in the caption.
+            for (prefix, label) in [("Started streaming on ", "Started Streaming"), ("Streamed live on ", "Streamed")]
+            where date.hasPrefix(prefix) {
+                return (String(date.dropFirst(prefix.count)), label)
+            }
             return (date, details?.relativeDateText ?? "Published")
         }
         if let age = video?.publishedTimeText?.nilIfEmpty { return (age, "Published") }

@@ -91,11 +91,11 @@ struct TVPlayerScreen: View {
     }
 
     /// Channel, views and age: what's known from the card, refined by the watch page. Live:
-    /// "🔴 LIVE · Channel · 5.3K watching", as YouTube marks it.
+    /// "Channel · 5.3K watching" (AVKit puts its own red LIVE tag in front of it).
     static func subtitle(vm: PlaybackViewModel, fallback: Video) -> String {
         let video = vm.currentVideo ?? fallback
         let details = vm.videoDetails
-        var parts: [String] = vm.isLive ? ["🔴 LIVE"] : []
+        var parts: [String] = []
         // A deep-linked video starts without title or channel; the player response has them.
         if let channel = video.channelTitle.nilIfEmpty ?? vm.playerInfo?.video.channelTitle.nilIfEmpty {
             parts.append(channel)
