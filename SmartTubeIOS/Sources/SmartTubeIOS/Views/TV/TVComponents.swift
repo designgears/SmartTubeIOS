@@ -104,6 +104,8 @@ struct TVVideoCard: View {
     var width: CGFloat = TVLayout.cardWidth
     /// Extra long-press action that takes the card off its shelf (e.g. Continue Watching).
     var removal: TVCardRemoval?
+    /// Lets a page move focus to this card (by video id), e.g. a channel's first live stream.
+    var focus: FocusState<String?>.Binding?
     let action: () -> Void
 
     @Environment(TVNavigator.self) private var navigator
@@ -124,6 +126,7 @@ struct TVVideoCard: View {
             }
         }
         .buttonStyle(.borderless)
+        .modifier(TVCardFocus(binding: focus, id: video.id))
         .contextMenu { TVVideoContextMenu(video: video, removal: removal) }
         // Re-read when the player closes so the bar reflects what was just watched.
         .task(id: TVProgressKey(videoId: video.id, playerOpen: navigator.nowPlaying != nil)) {
@@ -132,6 +135,20 @@ struct TVVideoCard: View {
         }
     }
 
+}
+
+/// Binds a card's button to a page's focus state, when the page passes one.
+private struct TVCardFocus: ViewModifier {
+    let binding: FocusState<String?>.Binding?
+    let id: String
+
+    func body(content: Content) -> some View {
+        if let binding {
+            content.focused(binding, equals: id)
+        } else {
+            content
+        }
+    }
 }
 
 /// A card's "remove from this shelf" menu action.

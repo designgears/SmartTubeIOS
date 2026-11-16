@@ -15,6 +15,10 @@ struct TVChannelView: View {
     @State private var vm: ChannelViewModel?
     @State private var isFollowing = false
     @Environment(\.dismiss) private var dismiss
+    /// The page opens on its first live stream when the channel is streaming.
+    @FocusState private var focusedLive: String?
+    @Namespace private var focusNamespace
+    @Environment(\.resetFocus) private var resetFocus
 
     var body: some View {
         ScrollView {
@@ -24,7 +28,7 @@ struct TVChannelView: View {
                     // Streaming now comes first, as on YouTube.
                     if !vm.live.isEmpty {
                         TVShelf(title: "Live", items: vm.live, prefetchWidth: TVLayout.cardWidth) { video in
-                            TVVideoCard(video: video) { navigator.play(video) }
+                            TVVideoCard(video: video, focus: $focusedLive) { navigator.play(video) }
                         }
                     }
                     // Settings › Hide Shorts covers channel pages too.
@@ -70,6 +74,14 @@ struct TVChannelView: View {
                 }
             }
             .padding(.bottom, 80)
+        }
+        // A streaming channel opens on its first live stream. The streams arrive after the page
+        // has picked a first card (the header's Follow), so focus is re-evaluated then.
+        // (Setting the focus state directly is refused by the focus engine here.)
+        .focusScope(focusNamespace)
+        .defaultFocus($focusedLive, vm?.live.first?.id)
+        .onChange(of: vm?.live.first?.id) { _, liveId in
+            if liveId != nil { resetFocus(in: focusNamespace) }
         }
         .task {
             guard vm == nil else { return }

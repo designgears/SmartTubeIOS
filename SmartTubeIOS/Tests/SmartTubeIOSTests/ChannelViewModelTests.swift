@@ -44,11 +44,10 @@ struct ChannelViewModelTests {
 
         #expect(vm.videos.map(\.id) == ["grid1", "grid2"])
         #expect(
-            mock.calls.map(\.method) == [
-                "fetchChannel", "fetchChannelVideos", "fetchChannelLive", "fetchChannelShorts",
-            ],
-            "Home supplies the header, the Videos tab the list, the Live tab what's streaming, the Shorts tab the Shorts")
-        #expect(mock.calls[1].args == ["UCchannel", "nil"])
+            mock.calls.map(\.method).first == "fetchChannel" && mock.calls.map(\.method).last == "fetchChannelShorts"
+                && Set(mock.calls.map(\.method)[1...2]) == ["fetchChannelVideos", "fetchChannelLive"],
+            "Home supplies the header; the Videos and Live tabs load together; then the Shorts tab")
+        #expect(mock.calls.first { $0.method == "fetchChannelVideos" }?.args == ["UCchannel", "nil"])
     }
 
     @Test("Streams live now lead the channel, from the Live tab and anything live on Home")

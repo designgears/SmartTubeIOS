@@ -212,11 +212,19 @@ public final class ChannelViewModel {
         do {
             let (ch, home) = try await api.fetchChannel(channelId: channelId)
             channel = ch
+            // The Live tab loads alongside the Videos tab and goes on the page first: live
+            // streams lead the channel, and the page should open focused on them.
+            let api = api
+            async let liveTab = (try? await api.fetchChannelLive(channelId: ch.id)) ?? []
             // The Home tab's continuation tokens are per shelf and return no videos, so paging
             // them stopped the list after the first page (#138). Page the Videos tab instead,
             // and keep Home for the header and the Shorts shelf.
             let grid = try? await retryWithBackoff(label: "ChannelVM") {
                 try await api.fetchChannelVideos(channelId: ch.id, continuationToken: nil)
+            }
+            var liveIds = Set<String>()
+            live = (await liveTab + home.videos + (grid?.videos ?? [])).filter {
+                $0.isLive && liveIds.insert($0.id).inserted
             }
             if let grid, !grid.videos.isEmpty {
                 videos = grid.videos
@@ -226,9 +234,6 @@ public final class ChannelViewModel {
                 videos = home.videos
                 nextPageToken = home.nextPageToken
             }
-            let liveTab = (try? await api.fetchChannelLive(channelId: ch.id)) ?? []
-            var liveIds = Set<String>()
-            live = (liveTab + home.videos + videos).filter { $0.isLive && liveIds.insert($0.id).inserted }
             let shortsTab = try? await api.fetchChannelShorts(channelId: ch.id, continuationToken: nil)
             if let shortsTab, !shortsTab.videos.isEmpty {
                 shorts = shortsTab.videos
