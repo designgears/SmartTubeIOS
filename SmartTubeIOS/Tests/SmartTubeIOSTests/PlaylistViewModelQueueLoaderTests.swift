@@ -44,12 +44,7 @@ struct PlaylistViewModelQueueLoaderTests {
         )
 
         vm.load(playlistId: "QUEUE_PLAYLIST")
-
-        // Poll until the async Task inside load() completes.
-        let deadline = Date().addingTimeInterval(2)
-        while vm.videos.isEmpty && Date() < deadline {
-            try await Task.sleep(for: .milliseconds(50))
-        }
+        await vm.awaitPendingFetch()  // a 2 s polling deadline was flaky under parallel load
 
         #expect(vm.videos.count == 2)
         #expect(vm.videos.first?.id == "aaa")

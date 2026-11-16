@@ -58,6 +58,11 @@ public final class PlaylistViewModel {
         observeFeedHideNotifications()
     }
 
+    /// Test hook: waits for the in-flight load, so tests don't poll with sleeps.
+    func awaitPendingFetch() async {
+        await fetchTask?.value
+    }
+
     public func load(playlistId: String, refresh: Bool = false) {
         // ── Queue short-circuit ────────────────────────────────────────────────
         // Delegates to `queueLoader` so this ViewModel is not coupled to
