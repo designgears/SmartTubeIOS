@@ -44,9 +44,27 @@ struct ChannelViewModelTests {
 
         #expect(vm.videos.map(\.id) == ["grid1", "grid2"])
         #expect(
-            mock.calls.map(\.method) == ["fetchChannel", "fetchChannelVideos", "fetchChannelShorts"],
-            "Home supplies the header, the Videos tab the list, the Shorts tab the Shorts")
+            mock.calls.map(\.method) == [
+                "fetchChannel", "fetchChannelVideos", "fetchChannelLive", "fetchChannelShorts",
+            ],
+            "Home supplies the header, the Videos tab the list, the Live tab what's streaming, the Shorts tab the Shorts")
         #expect(mock.calls[1].args == ["UCchannel", "nil"])
+    }
+
+    @Test("Streams live now lead the channel, from the Live tab and anything live on Home")
+    func liveStreamsComeFirst() async {
+        let mock = MockInnerTubeAPI()
+        var onHome = video("homeLive")
+        onHome.isLive = true
+        var fromTab = video("tabLive")
+        fromTab.isLive = true
+        mock.channelResult = (Channel(id: "UCchannel", title: "Channel"), VideoGroup(title: "Home", videos: [onHome]))
+        mock.channelVideosResult = VideoGroup(title: "V", videos: [video("grid1")])
+        mock.channelLiveResult = [fromTab, onHome]
+        let vm = ChannelViewModel(api: mock)
+        await vm.loadAsync(channelId: "UCchannel")
+        #expect(vm.live.map(\.id) == ["tabLive", "homeLive"])
+        #expect(vm.videos.map(\.id) == ["grid1"])
     }
 
     @Test("loadMore() continues with the Videos tab token, never the Home token")

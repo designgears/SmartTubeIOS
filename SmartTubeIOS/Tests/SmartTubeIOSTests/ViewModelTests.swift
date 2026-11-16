@@ -164,6 +164,12 @@ final class MockInnerTubeAPI: InnerTubeAPIProtocol {
         return channelShortsResult
     }
 
+    var channelLiveResult: [Video] = []
+    func fetchChannelLive(channelId: String) throws -> [Video] {
+        calls.append(Call(method: "fetchChannelLive", args: [channelId]))
+        return channelLiveResult
+    }
+
     func search(query: String, continuationToken: String?, filter: SearchFilter) async throws -> VideoGroup {
         calls.append(Call(method: "search", args: [query, continuationToken ?? "nil"]))
         if let e = errorToThrow { throw e }

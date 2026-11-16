@@ -186,6 +186,8 @@ public final class ChannelViewModel {
     /// The channel's Shorts tab (pages with `loadMoreShorts`), or the Home tab's Shorts shelf
     /// when there's no Shorts tab.
     public private(set) var shorts: [Video] = []
+    /// Streams the channel is live with right now, shown first.
+    public private(set) var live: [Video] = []
     public private(set) var isLoading: Bool = false
     public var error: Error?
 
@@ -224,6 +226,9 @@ public final class ChannelViewModel {
                 videos = home.videos
                 nextPageToken = home.nextPageToken
             }
+            let liveTab = (try? await api.fetchChannelLive(channelId: ch.id)) ?? []
+            var liveIds = Set<String>()
+            live = (liveTab + home.videos + videos).filter { $0.isLive && liveIds.insert($0.id).inserted }
             let shortsTab = try? await api.fetchChannelShorts(channelId: ch.id, continuationToken: nil)
             if let shortsTab, !shortsTab.videos.isEmpty {
                 shorts = shortsTab.videos

@@ -39,6 +39,8 @@ public protocol InnerTubeAPIProtocol: AnyObject, Sendable {
     func fetchChannelVideos(channelId: String, continuationToken: String?) async throws -> VideoGroup
     /// The channel's Shorts tab, paged like the Videos tab.
     func fetchChannelShorts(channelId: String, continuationToken: String?) async throws -> VideoGroup
+    /// The streams the channel is live with right now (from its Live tab).
+    func fetchChannelLive(channelId: String) async throws -> [Video]
 
     // MARK: Search
     func search(query: String, continuationToken: String?, filter: SearchFilter) async throws -> VideoGroup
@@ -67,6 +69,9 @@ public extension InnerTubeAPIProtocol {
     func fetchChannelShorts(channelId: String, continuationToken: String?) throws -> VideoGroup {
         VideoGroup(title: "", videos: [])
     }
+
+    /// Fakes that never stream: nothing live.
+    func fetchChannelLive(channelId: String) throws -> [Video] { [] }
 
     /// Fetches the flat recommended home feed from the first page.
     func fetchHome() async throws -> VideoGroup {

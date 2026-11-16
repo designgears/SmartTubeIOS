@@ -53,9 +53,17 @@ struct TVFeedView: View {
     }
 
     @ViewBuilder private var content: some View {
-        let videos = visibleVideos
+        let all = visibleVideos
+        // Subscriptions lead with whoever is live now; the feed is newest-first by publish
+        // date, which live streams don't have, so they'd otherwise sink to the bottom.
+        let live = type == .subscriptions ? all.filter(\.isLive) : []
+        let videos = live.isEmpty ? all : all.filter { !$0.isLive }
+        if !live.isEmpty {
+            TVShelf(title: "Live", items: live, prefetchWidth: TVLayout.cardWidth) { video in
+                TVVideoCard(video: video) { navigator.play(video) }
+            }
+        }
         if let vm, !videos.isEmpty {
-            // History is all watched by definition: no point fading it.
             TVVideoGrid(
                 videos: videos,
                 onReachEnd: {
@@ -64,6 +72,8 @@ struct TVFeedView: View {
                 pageKey: vm.videoGroups.flatMap(\.videos).count,
                 onSelect: { navigator.play($0) }
             )
+        } else if !live.isEmpty {
+            EmptyView()
         } else if vm == nil || vm?.isLoading == true {
             TVLoadingView().frame(height: 700)
         } else if needsSignIn {
@@ -163,10 +173,16 @@ struct TVChannelsView: View {
     @Environment(AuthService.self) private var auth
     @Environment(TVNavigator.self) private var navigator
     @State private var vm: BrowseViewModel?
+    /// The subscriptions feed, for which channels are live right now.
+    @State private var feedVM: BrowseViewModel?
     @State private var startedToken: String?? = .none
     @State private var showSignIn = false
 
     private let section = BrowseSection(type: .channels)
+
+    private var liveChannelIds: Set<String> {
+        Set((feedVM?.videoGroups.flatMap(\.videos) ?? []).filter(\.isLive).compactMap(\.channelId))
+    }
 
     var body: some View {
         ScrollView {
@@ -182,7 +198,8 @@ struct TVChannelsView: View {
                             TVChannelCard(
                                 title: channel.title,
                                 thumbnailURL: channel.thumbnailURL,
-                                subtitle: channel.subscriberCount
+                                subtitle: channel.subscriberCount,
+                                isLive: liveChannelIds.contains(channel.id)
                             ) {
                                 navigator.open(.channel(id: channel.id, title: channel.title))
                             }
@@ -221,6 +238,9 @@ struct TVChannelsView: View {
             startedToken = .some(token)
             if vm == nil { vm = BrowseViewModel(api: api, initialSection: section) }
             if let vm { await tvStartBrowse(vm, section: section, token: token) }
+            let feed = BrowseSection(type: .subscriptions)
+            if feedVM == nil { feedVM = BrowseViewModel(api: api, initialSection: feed) }
+            if let feedVM { await tvStartBrowse(feedVM, section: feed, token: token) }
         }
     }
 }

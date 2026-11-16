@@ -194,6 +194,8 @@ struct TVChannelCard: View {
     let title: String
     let thumbnailURL: URL?
     var subtitle: String?
+    /// Streaming right now: a red ring and a LIVE tag on the avatar, as YouTube marks it.
+    var isLive = false
     let action: () -> Void
 
     var body: some View {
@@ -208,6 +210,12 @@ struct TVChannelCard: View {
                 .background(Color.white.opacity(0.08))
                 .frame(width: TVLayout.channelSize, height: TVLayout.channelSize)
                 .clipShape(Circle())
+                .overlay {
+                    if isLive { Circle().strokeBorder(.red, lineWidth: 6) }
+                }
+                .overlay(alignment: .bottom) {
+                    if isLive { TVBadge(text: "LIVE", background: .red).offset(y: 12) }
+                }
                 .modifier(TVAvatarFocus())
                 VStack(spacing: 4) {
                     Text(title).font(.callout.weight(.semibold)).lineLimit(1)

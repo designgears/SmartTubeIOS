@@ -654,7 +654,7 @@ extension InnerTubeAPI {
         let description = videoDetails?["shortDescription"] as? String
         let durationStr = videoDetails?["lengthSeconds"] as? String
         let duration = durationStr.flatMap { Double($0) }
-        let isLive = videoDetails?["isLiveContent"] as? Bool ?? false
+        let isLive = Self.isLiveNow(videoDetails)
         let viewCount = (videoDetails?["viewCount"] as? String).flatMap { Int($0) }
         let channelId = videoDetails?["channelId"] as? String
         let category =

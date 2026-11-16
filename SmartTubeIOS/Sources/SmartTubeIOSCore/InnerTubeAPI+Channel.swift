@@ -76,6 +76,16 @@ extension InnerTubeAPI {
         return group
     }
 
+    /// The channel's Live tab, keeping only what's live now — the tab also lists upcoming
+    /// streams and every past one.
+    public func fetchChannelLive(channelId: String) async throws -> [Video] {
+        var body = makeBody(client: webClientContext)
+        body["browseId"] = channelId
+        body["params"] = "EgdzdHJlYW1z8gYECgJ6AA=="  // "Live" tab parameter
+        let data = try await post(endpoint: "browse", body: body)
+        return try parseVideoGroup(from: data, title: nil).videos.filter(\.isLive)
+    }
+
     // MARK: - Private channel helpers
 
     /// Resolves a YouTube `@handle` to the canonical `UC…` channel ID using the

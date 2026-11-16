@@ -75,3 +75,17 @@ struct WatchProgressParsingTests {
         #expect(InnerTubeAPI.resumePercent(in: [[String: Any]]()) == nil)
     }
 }
+
+@Suite("Live — player response")
+struct LiveNowTests {
+    @Test func liveOnlyWhileStreaming() {
+        #expect(InnerTubeAPI.isLiveNow(["isLive": true, "isLiveContent": true, "lengthSeconds": "0"]))
+        // An ended stream keeps isLiveContent; its replay has a length.
+        #expect(!InnerTubeAPI.isLiveNow(["isLiveContent": true, "lengthSeconds": "7342"]))
+        // Without isLive: a running stream has no length; an upcoming one doesn't count.
+        #expect(InnerTubeAPI.isLiveNow(["isLiveContent": true, "lengthSeconds": "0"]))
+        #expect(!InnerTubeAPI.isLiveNow(["isLiveContent": true, "lengthSeconds": "0", "isUpcoming": true]))
+        #expect(!InnerTubeAPI.isLiveNow(["lengthSeconds": "212"]))
+        #expect(!InnerTubeAPI.isLiveNow(nil))
+    }
+}

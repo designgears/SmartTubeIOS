@@ -90,14 +90,19 @@ struct TVPlayerScreen: View {
         )
     }
 
-    /// Channel, views and age: what's known from the card, refined by the watch page.
+    /// Channel, views and age: what's known from the card, refined by the watch page. Live:
+    /// "🔴 LIVE · Channel · 5.3K watching", as YouTube marks it.
     static func subtitle(vm: PlaybackViewModel, fallback: Video) -> String {
         let video = vm.currentVideo ?? fallback
         let details = vm.videoDetails
-        var parts: [String] = []
+        var parts: [String] = vm.isLive ? ["🔴 LIVE"] : []
         // A deep-linked video starts without title or channel; the player response has them.
         if let channel = video.channelTitle.nilIfEmpty ?? vm.playerInfo?.video.channelTitle.nilIfEmpty {
             parts.append(channel)
+        }
+        if vm.isLive {
+            if let watching = vm.watchingCount { parts.append("\(compactCount(watching)) watching") }
+            return parts.joined(separator: " · ")
         }
         if let views = vm.viewCount ?? video.viewCount {
             parts.append("\(compactCount(views)) views")

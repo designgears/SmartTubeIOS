@@ -205,6 +205,15 @@ public final class PlaybackViewModel {
     /// The watch page's exact count, else the player response's, else the card's.
     /// The first source that has a count; a zero is a placeholder some responses send, never
     /// better than the count the video's card already showed.
+    /// Live right now. The player response knows best: a card goes stale once a stream ends.
+    public var isLive: Bool { playerInfo.map { $0.video.isLive } ?? currentVideo?.isLive ?? false }
+
+    /// People watching a live video now (the watch page's count). Nil when not live.
+    public var watchingCount: Int? {
+        guard isLive, let count = videoDetails?.viewCount, count > 0 else { return nil }
+        return count
+    }
+
     public var viewCount: Int? {
         [videoDetails?.viewCount, playerInfo?.video.viewCount, currentVideo?.viewCount]
             .lazy.compactMap { $0 }.first { $0 > 0 }

@@ -20,7 +20,11 @@ struct TVDetailsPanel: View {
                 if let published = published(video, details) {
                     TVStat(symbol: AppSymbol.calendar, value: published.value, label: published.label)
                 }
-                if let views = vm.viewCount ?? video?.viewCount {
+                if vm.isLive {
+                    if let watching = vm.watchingCount {
+                        TVStat(symbol: AppSymbol.views, value: watching.formatted(), label: "Watching Now")
+                    }
+                } else if let views = vm.viewCount ?? video?.viewCount {
                     TVStat(symbol: AppSymbol.views, value: views.formatted(), label: views == 1 ? "View" : "Views")
                 }
                 if let likes = vm.likeCount {
@@ -30,7 +34,7 @@ struct TVDetailsPanel: View {
                     // Estimated by Return YouTube Dislike; YouTube no longer publishes them.
                     TVStat(symbol: AppSymbol.thumbsDown, value: dislikes.formatted(), label: "Dislikes")
                 }
-                if let video, !video.isLive, let duration = vm.playerInfo?.video.duration ?? video.duration,
+                if !vm.isLive, let duration = vm.playerInfo?.video.duration ?? video?.duration,
                     duration > 0
                 {
                     TVStat(symbol: AppSymbol.clock, value: formatDuration(duration), label: "Length")

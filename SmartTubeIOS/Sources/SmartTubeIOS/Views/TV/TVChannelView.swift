@@ -21,6 +21,12 @@ struct TVChannelView: View {
             VStack(alignment: .leading, spacing: TVLayout.sectionSpacing) {
                 header
                 if let vm {
+                    // Streaming now comes first, as on YouTube.
+                    if !vm.live.isEmpty {
+                        TVShelf(title: "Live", items: vm.live, prefetchWidth: TVLayout.cardWidth) { video in
+                            TVVideoCard(video: video) { navigator.play(video) }
+                        }
+                    }
                     // Settings › Hide Shorts covers channel pages too.
                     let shorts = store.settings.hideShorts ? [] : vm.shorts.uniquedByID()
                     if !shorts.isEmpty {
@@ -52,7 +58,7 @@ struct TVChannelView: View {
                             actionTitle: "Try Again"
                         ) { vm.load(channelId: channelId) }
                         .frame(height: 500)
-                    } else if shorts.isEmpty {
+                    } else if shorts.isEmpty, vm.live.isEmpty {
                         TVMessageView(
                             systemImage: AppSymbol.playRectangle,
                             title: "No videos",

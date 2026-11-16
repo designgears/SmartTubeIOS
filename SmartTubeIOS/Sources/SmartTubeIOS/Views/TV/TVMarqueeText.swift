@@ -132,7 +132,10 @@ extension Video {
         } else if isUpcoming {
             parts.append("Upcoming")
         }
-        if viewCount != nil { parts.append(formattedViewCount) }
+        if let viewCount {
+            // A live card's count is people watching now ("5.3K watching").
+            parts.append(isLive ? "\(compactCount(viewCount)) watching" : formattedViewCount)
+        }
         if !isLive, let date = publishedTimeText?.trimmingCharacters(in: .whitespaces), !date.isEmpty {
             // Only the age: some sources put views in the same text ("1.4B views • 5mo ago").
             parts.append(RelativeAge(date)?.text ?? date)
