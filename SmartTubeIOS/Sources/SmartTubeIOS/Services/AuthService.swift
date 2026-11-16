@@ -71,6 +71,11 @@ public final class AuthService {
     /// Every Google account signed in on this device (multi-account), and the active one.
     public internal(set) var savedAccounts: [SavedAccount] = []
     public internal(set) var activeAccountId: String?
+    /// Profiles left off Who's Watching? (Settings › Who's Watching). Device-wide, not per
+    /// account: it decides what the profile picker shows to everyone.
+    public internal(set) var hiddenProfileIds: Set<String> = Set(
+        UserDefaults.standard.stringArray(forKey: AuthService.hiddenProfilesKey) ?? [])
+    static let hiddenProfilesKey = "accounts.hiddenProfiles"
     /// While adding another account: the account to go back to if the user cancels.
     var accountToRestoreOnCancel: String?
     /// Bumped on every account change. Async auth work (token refresh, user info, cookies,
@@ -256,6 +261,7 @@ public final class AuthService {
         beginAccountChange()
         // Multi-account: signing out of one account switches to the next remaining one.
         let leaving = activeAccountId
+        if let leaving { forgetHiddenProfiles(of: leaving) }
         if let next = savedAccounts.first(where: { $0.id != leaving }) {
             savedAccounts.removeAll { $0.id == leaving }
             activeAccountId = nil

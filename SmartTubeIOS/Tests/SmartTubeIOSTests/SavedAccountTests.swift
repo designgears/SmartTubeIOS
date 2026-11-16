@@ -35,6 +35,33 @@ struct SavedAccountTests {
         #expect(!account(primary: "").isSameGoogleAccount(as: account(primary: "")))
     }
 
+    @Test func hiddenProfilesAreLeftOffWhosWatching() {
+        var saved = account(gaia: "1", primary: "Me")
+        saved.channels = [
+            YouTubeChannel(name: "Me", avatarURL: nil, pageId: nil),
+            YouTubeChannel(name: "Me", avatarURL: nil, pageId: "brand"),
+        ]
+        let profiles = AccountProfile.profiles(for: saved)
+        let brand = AccountProfile.slot(accountId: saved.id, pageId: "brand")
+
+        let shown = AccountProfile.shown(profiles, hidden: [brand], activeId: saved.id)
+        #expect(shown.map(\.id) == [saved.id])
+    }
+
+    @Test func theProfileInUseIsShownEvenWhenHidden() {
+        let saved = account(gaia: "1", primary: "Me")
+        let profiles = AccountProfile.profiles(for: saved)
+
+        let shown = AccountProfile.shown(profiles, hidden: [saved.id], activeId: saved.id)
+        #expect(shown.map(\.id) == [saved.id])
+        #expect(AccountProfile.shown(profiles, hidden: [saved.id], activeId: nil).isEmpty)
+    }
+
+    @Test func slotMapsBackToItsAccount() {
+        #expect(AccountProfile.accountId(ofSlot: "A") == "A")
+        #expect(AccountProfile.accountId(ofSlot: AccountProfile.slot(accountId: "A", pageId: "p1")) == "A")
+    }
+
     @Test func eachChannelIsItsOwnProfile() {
         var saved = account(gaia: "1", primary: "Aunt")
         saved.channels = [

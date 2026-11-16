@@ -1,5 +1,6 @@
 import Foundation
 import SmartTubeIOSCore
+
 #if canImport(WebKit)
 import WebKit
 #endif
@@ -25,6 +26,29 @@ extension AuthService {
         savedAccounts.flatMap { account in
             AccountProfile.profiles(for: account, liveChannels: account.id == activeAccountId ? channels : nil)
         }
+    }
+
+    /// The profiles Who's Watching? shows: all but the hidden ones (the one in use always shows).
+    public var whosWatchingProfiles: [AccountProfile] {
+        AccountProfile.shown(profiles, hidden: hiddenProfileIds, activeId: activeProfileId)
+    }
+
+    /// Hides a profile from (or shows it again on) Who's Watching?. It stays signed in and
+    /// reachable from Settings.
+    public func setProfile(_ profile: AccountProfile, hidden: Bool) {
+        if hidden { hiddenProfileIds.insert(profile.id) } else { hiddenProfileIds.remove(profile.id) }
+        persistHiddenProfiles()
+    }
+
+    /// A signed-out account's profiles no longer need a hidden flag.
+    func forgetHiddenProfiles(of accountId: String) {
+        let before = hiddenProfileIds
+        hiddenProfileIds = hiddenProfileIds.filter { AccountProfile.accountId(ofSlot: $0) != accountId }
+        if hiddenProfileIds != before { persistHiddenProfiles() }
+    }
+
+    private func persistHiddenProfiles() {
+        UserDefaults.standard.set(hiddenProfileIds.sorted(), forKey: Self.hiddenProfilesKey)
     }
 
     /// The active profile's id (AccountScope slot), nil for Guest.
@@ -145,6 +169,7 @@ extension AuthService {
         savedAccounts.removeAll { $0.id == id }
         persistSavedAccounts()
         AccountScope.forget(id)
+        forgetHiddenProfiles(of: id)
     }
 
     // MARK: UI testing

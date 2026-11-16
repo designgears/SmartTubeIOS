@@ -100,6 +100,13 @@ public struct SettingsView: View {
 
     // MARK: - Account
 
+    /// "All" or "2 of 3" for the Who's Watching row.
+    private var whosWatchingSummary: String {
+        let all = auth.profiles.count
+        let shown = auth.profiles.filter { !auth.hiddenProfileIds.contains($0.id) }.count
+        return shown == all ? "All" : "\(shown) of \(all)"
+    }
+
     private var accountSection: some View {
         Section("Account") {
             if auth.isSignedIn {
@@ -151,6 +158,14 @@ public struct SettingsView: View {
                 Button(auth.savedAccounts.isEmpty ? "Sign in with Google" : "Add Account") { showSignIn = true }
                     .accessibilityIdentifier("settings.signInButton")
                     .sheet(isPresented: $showSignIn) { SignInView() }
+            }
+            if auth.profiles.count > 1 {
+                NavigationLink {
+                    WhosWatchingSettingsView()
+                } label: {
+                    LabeledContent("Who's Watching", value: whosWatchingSummary)
+                }
+                .accessibilityIdentifier("settings.whosWatchingLink")
             }
         }
         // On the section, not the "Add Account" button: starting an add signs the current

@@ -69,7 +69,24 @@ public struct AccountProfile: Identifiable, Equatable, Sendable {
     /// AccountScope slot. The primary channel uses the bare account id (data saved before
     /// channels were profiles stays with it); Brand channels get their own slot.
     public static func slot(accountId: String, pageId: String?) -> String {
-        pageId.map { "\(accountId).channel.\($0)" } ?? accountId
+        pageId.map { "\(accountId)\(channelSeparator)\($0)" } ?? accountId
+    }
+
+    private static let channelSeparator = ".channel."
+
+    /// The account a profile slot belongs to (inverse of `slot(accountId:pageId:)`).
+    public static func accountId(ofSlot slot: String) -> String {
+        slot.range(of: channelSeparator).map { String(slot[..<$0.lowerBound]) } ?? slot
+    }
+
+    /// The profiles shown on Who's Watching?: hidden ones are left out, except the one in
+    /// use, so the current profile never disappears from under the user.
+    public static func shown(
+        _ profiles: [AccountProfile], hidden: Set<String>, activeId: String?
+    )
+        -> [AccountProfile]
+    {
+        profiles.filter { !hidden.contains($0.id) || $0.id == activeId }
     }
 
     /// The profiles an account offers: one per known channel, or a single profile when its

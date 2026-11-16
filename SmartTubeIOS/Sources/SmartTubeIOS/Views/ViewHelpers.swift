@@ -154,6 +154,7 @@ enum AppSymbol {
     static let download = "arrow.down.to.line"
     static let watchLater = "clock.badge"
     static let audioOnly = "waveform.circle"
+    static let hide = "eye.slash"
 
     // MARK: - Status / info
     static let warning = "exclamationmark.triangle.fill"

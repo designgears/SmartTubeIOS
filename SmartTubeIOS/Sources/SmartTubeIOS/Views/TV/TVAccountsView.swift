@@ -25,8 +25,9 @@ struct TVAccountsView: View {
                     columns: [GridItem(.adaptive(minimum: 250, maximum: 290), spacing: 40, alignment: .top)],
                     spacing: 56
                 ) {
-                    // One card per channel (primary and Brand Accounts) of every signed-in account.
-                    ForEach(auth.profiles) { profile in
+                    // One card per channel (primary and Brand Accounts) of every signed-in account,
+                    // minus the ones hidden in Settings › Who's Watching.
+                    ForEach(auth.whosWatchingProfiles) { profile in
                         let isCurrent = profile.id == auth.activeProfileId
                         TVChannelCard(
                             title: profile.name,
@@ -39,6 +40,11 @@ struct TVAccountsView: View {
                             navigator.selection = .home
                         }
                         .contextMenu {
+                            if !isCurrent {
+                                Button("Hide from Who's Watching", systemImage: AppSymbol.hide) {
+                                    auth.setProfile(profile, hidden: true)
+                                }
+                            }
                             Button(
                                 "Sign Out of \(accountName(profile.accountId))", systemImage: AppSymbol.signOut,
                                 role: .destructive
