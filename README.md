@@ -23,6 +23,23 @@ Inspired by the original [SmartTube Android app](https://github.com/yuliskov/Sma
   </tr>
 </table>
 
+### Apple TV
+
+<table>
+  <tr>
+    <td><img src="docs/screenshots/tvos/channel-live.jpg" width="400"/><br/>A live channel opens on its stream</td>
+    <td><img src="docs/screenshots/tvos/live-player.jpg" width="400"/><br/>Live in the player</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/tvos/player.jpg" width="400"/><br/>SponsorBlock segments above the scrubber</td>
+    <td><img src="docs/screenshots/tvos/quality-auto.jpg" width="400"/><br/>Auto shows the quality it's playing</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/tvos/sponsorblock-bar.jpg" width="400"/><br/>SponsorBlock strip, close up</td>
+    <td><img src="docs/screenshots/tvos/settings-colors.jpg" width="300"/><br/>Live and watched-bar colors</td>
+  </tr>
+</table>
+
 ---
 
 ## Features
