@@ -155,6 +155,15 @@ struct TVHomeView: View {
             localProgress = fractions
             removedFromContinue = removed
         }
+        // Who's live, while Home is up: on arrival, after the player closes, and every few
+        // minutes (not during playback).
+        .task(id: TVLiveRefreshKey(token: auth.accessToken, playerOpen: navigator.nowPlaying != nil)) {
+            guard isSignedIn, let token = auth.accessToken, navigator.nowPlaying == nil else { return }
+            while !Task.isCancelled {
+                await SubscriptionLiveStore.shared.refresh(api: api, token: token)
+                try? await Task.sleep(for: Self.liveRefreshInterval)
+            }
+        }
         // Seed the playback session as soon as there is something to play, so the first
         // Play doesn't wait on the watch-page round-trip.
         .task(id: recommendedAll.first?.id) {
@@ -164,6 +173,9 @@ struct TVHomeView: View {
     }
 
     // MARK: Data
+
+    /// How often Live Now re-checks who's live while Home is up.
+    static let liveRefreshInterval: Duration = .seconds(180)
 
     private var isSignedIn: Bool { auth.isSignedIn && auth.accessToken != nil }
 
@@ -188,12 +200,13 @@ struct TVHomeView: View {
         homeVM?.sections.first { $0.section.type == .subscriptions }
     }
 
-    /// What the Live Now shelf shows: the subscription feed's live streams (never hidden as
-    /// watched — they're happening now).
+    /// What the Live Now shelf shows: subscribed channels' live streams (never hidden as
+    /// watched — they're happening now). Each card plays the stream.
     private var liveNow: [Video] {
         guard isSignedIn else { return [] }
-        let subs = subscriptionsSection?.videos ?? []
-        return subs.filter { $0.isLive && !($0.isShort && hideShorts) }.uniquedByID()
+        let fromFeed = (subscriptionsSection?.videos ?? []).filter(\.isLive)
+        return (SubscriptionLiveStore.shared.videos + fromFeed)
+            .filter { !($0.isShort && hideShorts) }.uniquedByID()
     }
 
     private var subscriptionVideos: [Video] {
@@ -272,6 +285,11 @@ struct TVHomeView: View {
 /// Identity of the history-derived state: the history list, and whether the player is open.
 private struct TVHistoryKey: Hashable {
     let ids: [String]
+    let playerOpen: Bool
+}
+
+private struct TVLiveRefreshKey: Hashable {
+    let token: String?
     let playerOpen: Bool
 }
 

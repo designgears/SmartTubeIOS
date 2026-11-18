@@ -1,5 +1,9 @@
 /// Accessibility identifiers, for UI tests. One definition each (AGENTS.md); add new ones here.
 enum AccessibilityID {
+    enum Channels {
+        static let sortMenu = "channels.sortMenu"
+    }
+
     enum Settings {
         static let accentColorPicker = "settings.accentColorPicker"
         static let accountsLink = "settings.accountsLink"

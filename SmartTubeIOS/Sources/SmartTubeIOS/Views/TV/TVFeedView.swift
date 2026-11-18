@@ -172,16 +172,17 @@ struct TVChannelsView: View {
     @Environment(\.innerTubeAPI) private var api
     @Environment(AuthService.self) private var auth
     @Environment(TVNavigator.self) private var navigator
+    @Environment(SettingsStore.self) private var store
     @State private var vm: BrowseViewModel?
-    /// The subscriptions feed, for which channels are live right now.
-    @State private var feedVM: BrowseViewModel?
     @State private var startedToken: String?? = .none
     @State private var showSignIn = false
+    private var live: SubscriptionLiveStore { .shared }
 
     private let section = BrowseSection(type: .channels)
 
-    private var liveChannelIds: Set<String> {
-        Set((feedVM?.videoGroups.flatMap(\.videos) ?? []).filter(\.isLive).compactMap(\.channelId))
+    /// In the chosen order, live channels first.
+    private var channels: [Channel] {
+        store.settings.channelSort.sorted(vm?.subscribedChannels ?? []) { live.isLive($0) }
     }
 
     var body: some View {
@@ -189,17 +190,18 @@ struct TVChannelsView: View {
             VStack(alignment: .leading, spacing: 16) {
                 TVPageHeader(
                     title: "Channels", subtitle: auth.isSignedIn ? nil : "Channels you follow on this Apple TV")
-                if let vm, !vm.subscribedChannels.isEmpty {
+                if !channels.isEmpty {
+                    sortMenu
                     LazyVGrid(
                         columns: [GridItem(.adaptive(minimum: 250, maximum: 290), spacing: 40, alignment: .top)],
                         spacing: 56
                     ) {
-                        ForEach(vm.subscribedChannels) { channel in
+                        ForEach(channels) { channel in
                             TVChannelCard(
                                 title: channel.title,
                                 thumbnailURL: channel.thumbnailURL,
                                 subtitle: channel.subscriberCount,
-                                isLive: liveChannelIds.contains(channel.id)
+                                isLive: live.isLive(channel)
                             ) {
                                 navigator.open(.channel(id: channel.id, title: channel.title))
                             }
@@ -238,10 +240,28 @@ struct TVChannelsView: View {
             startedToken = .some(token)
             if vm == nil { vm = BrowseViewModel(api: api, initialSection: section) }
             if let vm { await tvStartBrowse(vm, section: section, token: token) }
-            let feed = BrowseSection(type: .subscriptions)
-            if feedVM == nil { feedVM = BrowseViewModel(api: api, initialSection: feed) }
-            if let feedVM { await tvStartBrowse(feedVM, section: feed, token: token) }
         }
+        // Who's live, each time the page shows (at most every couple of minutes).
+        .task(id: auth.accessToken) {
+            if auth.isSignedIn, let token = auth.accessToken { await live.refresh(api: api, token: token) }
+        }
+    }
+
+    private var sortMenu: some View {
+        @Bindable var store = store
+        return HStack {
+            Menu {
+                Picker("Sort", selection: $store.settings.channelSort) {
+                    ForEach(ChannelSort.allCases, id: \.self) { Text($0.title).tag($0) }
+                }
+            } label: {
+                Label("Sort: \(store.settings.channelSort.title)", systemImage: AppSymbol.sortOrder)
+            }
+            .accessibilityIdentifier(AccessibilityID.Channels.sortMenu)
+            Spacer()
+        }
+        .padding(.horizontal, TVLayout.pageInset)
+        .focusSection()
     }
 }
 #endif

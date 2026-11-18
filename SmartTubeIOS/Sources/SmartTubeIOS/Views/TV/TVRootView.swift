@@ -66,6 +66,9 @@ private struct TVSidebarTabs: View {
             Tab("Subscriptions", systemImage: AppSymbol.subscriptions, value: TVTab.subscriptions) {
                 TVTabStack(tab: .subscriptions) { TVFeedView(type: .subscriptions) }
             }
+            Tab("Channels", systemImage: AppSymbol.accountsFill, value: TVTab.channels) {
+                TVTabStack(tab: .channels) { TVChannelsView() }
+            }
             Tab(value: TVTab.search, role: .search) {
                 TVTabStack(tab: .search) { TVSearchView() }
             }
@@ -105,9 +108,6 @@ private struct TVSidebarTabs: View {
                 Tab("Playlists", systemImage: AppSymbol.playlists, value: TVTab.playlists) {
                     TVTabStack(tab: .playlists) { TVFeedView(type: .playlists) }
                 }
-                Tab("Channels", systemImage: AppSymbol.accountsFill, value: TVTab.channels) {
-                    TVTabStack(tab: .channels) { TVChannelsView() }
-                }
                 Tab("Queue", systemImage: AppSymbol.upNext, value: TVTab.queue) {
                     TVTabStack(tab: .queue) {
                         TVPlaylistView(playlistId: CurrentQueueStore.playlistID, title: "Queue")
@@ -137,6 +137,9 @@ private struct TVLegacyTabs: View {
             TVTabStack(tab: .subscriptions) { TVFeedView(type: .subscriptions) }
                 .tabItem { Label("Subscriptions", systemImage: AppSymbol.subscriptions) }
                 .tag(TVTab.subscriptions)
+            TVTabStack(tab: .channels) { TVChannelsView() }
+                .tabItem { Label("Channels", systemImage: AppSymbol.accountsFill) }
+                .tag(TVTab.channels)
             TVTabStack(tab: .search) { TVSearchView() }
                 .tabItem { Label("Search", systemImage: AppSymbol.search) }
                 .tag(TVTab.search)

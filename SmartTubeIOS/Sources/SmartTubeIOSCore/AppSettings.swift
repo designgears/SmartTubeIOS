@@ -104,6 +104,8 @@ public struct AppSettings: Codable {
     public var liveColor: AccentColorChoice
     /// The bar on a card showing how much of the video has been watched.
     public var watchedBarColor: AccentColorChoice
+    /// The order of the Channels page (live channels always first).
+    public var channelSort: ChannelSort
     /// Video grid column count when the window is taller than wide (ignored on tvOS).
     public var gridColumnsPortrait: Int
     /// Video grid column count when the window is wider than tall (ignored on tvOS).
@@ -323,6 +325,7 @@ public struct AppSettings: Codable {
         accentColor = .system
         liveColor = Self.defaultMarkColor
         watchedBarColor = Self.defaultMarkColor
+        channelSort = .youTube
         gridColumnsPortrait = 2
         gridColumnsLandscape = 3
         enabledSections = BrowseSection.defaultSections.map(\.type)
@@ -421,6 +424,7 @@ extension AppSettings {
         case accentColor
         case liveColor
         case watchedBarColor
+        case channelSort
         case gridColumnsPortrait
         case gridColumnsLandscape
         case enabledSections
@@ -451,6 +455,19 @@ extension AppSettings {
             (try? legacy.decode(Bool.self, forKey: .disableLiquidGlass)) == true
         else { return nil }
         return .solid
+    }
+
+    /// The live and watched-bar colors, each defaulted when missing.
+    private static func markColors(
+        _ container: KeyedDecodingContainer<CodingKeys>
+    )
+        -> (AccentColorChoice, AccentColorChoice)
+    {
+        (markColor(container, .liveColor), markColor(container, .watchedBarColor))
+    }
+
+    private static func channelOrder(_ container: KeyedDecodingContainer<CodingKeys>) -> ChannelSort {
+        container.safeDecode(ChannelSort.self, forKey: .channelSort, default: .youTube)
     }
 
     /// A saved mark color, or the default (settings from before it existed, or unknown values).
@@ -508,7 +525,7 @@ extension AppSettings {
             Bool.self, forKey: .perDeviceRecommendationsEnabled, default: d.perDeviceRecommendationsEnabled)
         themeName = c.safeDecode(ThemeName.self, forKey: .themeName, default: d.themeName)
         accentColor = c.safeDecode(AccentColorChoice.self, forKey: .accentColor, default: d.accentColor)
-        (liveColor, watchedBarColor) = (Self.markColor(c, .liveColor), Self.markColor(c, .watchedBarColor))
+        ((liveColor, watchedBarColor), channelSort) = (Self.markColors(c), Self.channelOrder(c))
         let columns = Self.availableGridColumnCounts
         gridColumnsPortrait = min(
             max(
