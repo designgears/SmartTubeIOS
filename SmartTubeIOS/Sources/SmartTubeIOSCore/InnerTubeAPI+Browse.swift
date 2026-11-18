@@ -98,25 +98,25 @@ extension InnerTubeAPI {
     /// Fetches the list of channels the authenticated user subscribes to (requires auth).
     ///
     /// Strategy:
-    ///  1. `/guide` endpoint with TV client + auth — returns the TV sidebar guide which
-    ///     includes every subscribed channel with avatar thumbnail URLs via guideEntryRenderer.
-    ///  2. If that yields no channels, fall back to parsing unique channels from the
-    ///     TVHTML5 video-tile subscription feed (channel IDs + names, no avatars).
+    ///  1. The TV Subscriptions page's side list — every subscribed channel, with avatars
+    ///     (`parseSubscriptionTabs`).
+    ///  2. The TV guide sidebar, if that list is missing.
+    ///  3. Channels found in the subscription feed's video tiles (only those with a recent
+    ///     video; no avatars).
     public func fetchSubscribedChannels() async throws -> [Channel] {
-        // Primary: TV guide sidebar — includes subscribed channels with avatar thumbnails
-        let guideBody = makeBody(client: tvClientContext)
-        let guideData = try await postTV(endpoint: "guide", body: guideBody)
-        let guideKeys = Array(guideData.keys.sorted().prefix(8))
-        tubeLog.notice("fetchSubscribedChannels guide top-level keys: \(guideKeys, privacy: .public)")
-        let guideChannels = parseGuideChannels(from: guideData)
-        tubeLog.notice("fetchSubscribedChannels guide → \(guideChannels.count, privacy: .public) channels")
-        if !guideChannels.isEmpty { return guideChannels }
-
-        // Fallback: TV subscription video-tile feed — extract unique channels (no avatars)
-        tubeLog.notice("fetchSubscribedChannels: guide returned 0 — falling back to video tile parse")
         var tvBody = makeBody(client: tvClientContext)
         tvBody["browseId"] = "FEsubscriptions"
         let tvData = try await postTV(endpoint: "browse", body: tvBody)
+        let listed = Self.parseSubscriptionTabs(from: tvData)
+        tubeLog.notice("fetchSubscribedChannels subscriptions list → \(listed.count, privacy: .public) channels")
+        if !listed.isEmpty { return listed }
+
+        if let guideData = try? await postTV(endpoint: "guide", body: makeBody(client: tvClientContext)) {
+            let guideChannels = parseGuideChannels(from: guideData)
+            tubeLog.notice("fetchSubscribedChannels guide → \(guideChannels.count, privacy: .public) channels")
+            if !guideChannels.isEmpty { return guideChannels }
+        }
+        tubeLog.notice("fetchSubscribedChannels: no channel list — falling back to video tile parse")
         return parseSubscribedChannels(from: tvData)
     }
 
