@@ -178,4 +178,42 @@ struct ShortsVerticalThumbnailTests {
             "A 95-minute tile with portrait thumbnail must NOT be tagged isShort"
         )
     }
+
+    /// A live stream in the subscription feed: LIVE overlay, no duration, a landscape
+    /// thumbnail and the Shorts `ustreamerConfig` hint. It's a live stream, not a Short (with
+    /// Hide Shorts on, it vanished from Live Now and the feeds).
+    @Test("tileRenderer: live stream with the Shorts hint → isLive, not a Short")
+    func tileRendererLiveStreamWithShortsHint() async throws {
+        let tile: [String: Any] = [
+            "contentType": "TILE_CONTENT_TYPE_VIDEO",
+            "contentId": "liveStream1",
+            "style": "TILE_STYLE_YTLR_DEFAULT",
+            "onSelectCommand": [
+                "watchEndpoint": ["videoId": "liveStream1", "ustreamerConfig": "GgIIBQ=="]
+            ],
+            "header": [
+                "tileHeaderRenderer": [
+                    "thumbnail": ["thumbnails": [["url": "https://example.com/live.jpg", "width": 480, "height": 360]]],
+                    "thumbnailOverlays": [
+                        ["thumbnailOverlayTimeStatusRenderer": ["style": "LIVE", "text": ["simpleText": "LIVE"]]]
+                    ],
+                ]
+            ],
+            "metadata": [
+                "tileMetadataRenderer": [
+                    "title": ["simpleText": "Streaming now"],
+                    "lines": [
+                        ["lineRenderer": ["items": [["lineItemRenderer": ["text": ["simpleText": "Some Channel"]]]]]],
+                        ["lineRenderer": ["items": [["lineItemRenderer": ["text": ["simpleText": "5.6K watching"]]]]]],
+                    ],
+                ]
+            ],
+        ]
+        let group = try await InnerTubeAPI().parseVideoGroupForTesting(
+            makeTileRendererResponse(tile), title: "Subscriptions"
+        )
+        let video = try #require(group.videos.first)
+        #expect(video.isLive)
+        #expect(!video.isShort)
+    }
 }

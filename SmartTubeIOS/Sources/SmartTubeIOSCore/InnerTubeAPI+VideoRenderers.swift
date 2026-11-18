@@ -612,8 +612,10 @@ extension InnerTubeAPI {
         // videos that appear in Shorts-adjacent shelves (subscription Shorts shelf, history,
         // home recommendations). Guard with a 180 s ceiling — the maximum YouTube Shorts
         // length — so only genuine Shorts are matched. When duration is unknown (nil),
-        // default to trusting the signal.
-        let isUstreamerShorts = ustreamerConfig == "GgIIBQ==" && (duration.map { $0 <= 180 } ?? true)
+        // default to trusting the signal — except on a live stream, which never has a
+        // duration and carries the hint too (subscription feed, 2026-11); a live Short is still
+        // caught by the tile style, reel endpoint or portrait thumbnail.
+        let isUstreamerShorts = ustreamerConfig == "GgIIBQ==" && !isLive && (duration.map { $0 <= 180 } ?? true)
 
         let isShort =
             (tile["style"] as? String) == "TILE_STYLE_YTLR_SHORTS"
