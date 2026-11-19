@@ -23,7 +23,6 @@ struct TVChatPanel: View {
                 .clipped()
                 .frame(maxWidth: .infinity, alignment: .trailing)
         }
-        .animation(.easeOut(duration: 0.2), value: feed.messages.last?.id)
         .allowsHitTesting(false)
         .accessibilityLabel("Live chat")
     }
@@ -45,7 +44,7 @@ struct TVChatPanel: View {
             }
         }
         .padding(.horizontal, 28)
-        .padding(.bottom, 70)
+        .padding(.bottom, 24)
         .frame(width: Self.width)
         .fixedSize(horizontal: false, vertical: true)
     }
