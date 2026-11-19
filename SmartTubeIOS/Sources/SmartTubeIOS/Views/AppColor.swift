@@ -9,18 +9,14 @@ import SwiftUI
 @MainActor
 enum AppColor {
     /// LIVE badges, rings and tags — the app's own and the player's (see `TVLiveBadgeTint`) — in
-    /// the service's own LIVE color: YouTube's red, Twitch's red, Kick's green.
+    /// the service's color: YouTube red, Twitch purple, Kick green.
     static func live(_ platform: StreamPlatform = .youtube) -> Color {
-        switch platform {
-        case .youtube: Color(red: 0xFF / 255, green: 0, blue: 0)
-        case .twitch: Color(red: 0xEB / 255, green: 0x04 / 255, blue: 0)
-        case .kick: Color(red: 0x53 / 255, green: 0xFC / 255, blue: 0x18 / 255)
-        }
+        self.platform(platform)
     }
 
     /// Text on a `live` badge: Kick's green is light.
     static func onLive(_ platform: StreamPlatform = .youtube) -> Color {
-        platform == .kick ? .black : .white
+        onPlatform(platform)
     }
 
     /// The bar on a card showing how much has been watched.
@@ -28,12 +24,12 @@ enum AppColor {
         mark(store?.settings.watchedBarColor)
     }
 
-    /// Twitch's purple and Kick's green, for their badges.
+    /// Each service's color: YouTube red, Twitch purple, Kick green.
     static func platform(_ platform: StreamPlatform) -> Color {
         switch platform {
+        case .youtube: Color(red: 0xFF / 255, green: 0, blue: 0)
         case .twitch: Color(red: 0x91 / 255, green: 0x46 / 255, blue: 0xFF / 255)
         case .kick: Color(red: 0x53 / 255, green: 0xFC / 255, blue: 0x18 / 255)
-        case .youtube: .red
         }
     }
 
