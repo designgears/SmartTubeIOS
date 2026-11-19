@@ -42,6 +42,8 @@ fastlane/test_output
 
 # Environment / secrets
 *.env
+# The xtool adapter's icon settings (no secrets).
+!SmartTubeApp/omarchy-xtool/xtool.env
 *.p8
 *.p12
 *.mobileprovision

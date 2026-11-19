@@ -84,13 +84,15 @@ metrics:
     @echo "mirror tests:"; grep -rli 'mirror' {{package}}/Tests | wc -l
 
 # --- Linux (omarchy-apple-dev + x86sim; docs/how-to/build-on-linux.md) -------
-# tvOS app for the simulator: SmartTubeApp/omarchy-xtool/xtool/Smart Tube.app
-linux-build-tvos:
-    cd {{root}}/SmartTubeApp/omarchy-xtool && xtool dev build -c debug --triple arm64-apple-tvos-simulator
+omarchy_apple_dev := env_var_or_default("OMARCHY_APPLE_DEV", env_var("HOME") + "/omarchy-apple-dev")
 
-# Signed tvOS app for the Apple TV (xtool's team and profile).
+# tvOS app for the simulator, with its icon and Top Shelf: SmartTubeApp/omarchy-xtool/xtool/Smart Tube.app
+linux-build-tvos:
+    cd {{root}}/SmartTubeApp/omarchy-xtool && CONFIGURATION=debug TRIPLE=arm64-apple-tvos-simulator {{omarchy_apple_dev}}/ship.sh --device
+
+# Signed tvOS app for the Apple TV (xtool's team, a tvOS profile, the exact bundle ID).
 linux-build-tvos-device:
-    cd {{root}}/SmartTubeApp/omarchy-xtool && xtool dev build --sign -c release --triple arm64-apple-tvos
+    cd {{root}}/SmartTubeApp/omarchy-xtool && TRIPLE=arm64-apple-tvos {{omarchy_apple_dev}}/ship.sh --device && xtool sign "xtool/Smart Tube.app"
 
 # Unit tests in an x86sim Apple TV (X86SIM_ROOT must point at the x86sim checkout).
 linux-test:
