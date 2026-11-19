@@ -12,6 +12,7 @@ Architecture map: docs/architecture.md · Glossary: CONTEXT.md · Decisions: doc
 - `just test-unit` / `just test-unit-filter <Name>` — Swift Testing package tests (no simulator).
 - `just test-smoke` — hermetic UI smoke plan. `just test-ui` — live UI plan (needs signed-in simulator; 3 workers max, see docs/how-to/run-tests.md).
 - `just format` — swift-format in place. `just lint` — SwiftLint against the committed baseline.
+- On Linux (omarchy-apple-dev + x86sim): `just linux-build-tvos`, `just linux-test`, `just linux-build-tvos-device` — see docs/how-to/build-on-linux.md.
 
 ## Rules that differ from defaults
 - Swift 6 strict concurrency everywhere. View models are `@MainActor @Observable`. No `ObservableObject`, `@Published`, Combine, `DispatchQueue`, completion handlers in new code.

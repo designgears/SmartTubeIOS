@@ -53,7 +53,7 @@ struct SmartTubeTVApp: App {
                 .environment(settingsStore)
                 .environment(\.innerTubeAPI, api)
                 #if ENABLE_DOWNLOADS
-                .environment(cardDownloadService)
+            .environment(cardDownloadService)
                 #endif
                 .onChange(of: authService.accessToken, initial: true) { _, newToken in
                     Task {

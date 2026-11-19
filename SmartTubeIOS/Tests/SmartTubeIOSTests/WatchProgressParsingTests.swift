@@ -20,7 +20,9 @@ struct WatchProgressParsingTests {
                                             "rendererContext": [
                                                 "commandContext": [
                                                     "onTap": [
-                                                        "innertubeCommand": ["watchEndpoint": ["videoId": "watchedvid1"]]
+                                                        "innertubeCommand": [
+                                                            "watchEndpoint": ["videoId": "watchedvid1"]
+                                                        ]
                                                     ]
                                                 ]
                                             ],
@@ -29,7 +31,9 @@ struct WatchProgressParsingTests {
                                             ],
                                             "contentImage": [
                                                 "thumbnailViewModel": [
-                                                    "image": ["thumbnails": [["url": "https://i.ytimg.com/vi/x/hq.jpg"]]],
+                                                    "image": [
+                                                        "thumbnails": [["url": "https://i.ytimg.com/vi/x/hq.jpg"]]
+                                                    ],
                                                     "overlays": overlays,
                                                 ]
                                             ],

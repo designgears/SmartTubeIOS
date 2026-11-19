@@ -97,7 +97,8 @@ public func consistentLiveVariants(_ manifest: String) -> String {
         return Variant(
             index: index,
             bandwidth: hlsAttribute("BANDWIDTH", in: line).flatMap { Int($0) } ?? 0,
-            audio: hlsAttribute("CODECS", in: line)?.split(separator: ",").first { $0.hasPrefix("mp4a") }.map(String.init),
+            audio: hlsAttribute("CODECS", in: line)?.split(separator: ",").first { $0.hasPrefix("mp4a") }.map(
+                String.init),
             frameRate: hlsAttribute("FRAME-RATE", in: line))
     }
     guard let best = variants.max(by: { $0.bandwidth < $1.bandwidth }) else { return manifest }

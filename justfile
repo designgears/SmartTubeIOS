@@ -13,12 +13,15 @@ workers   := "3"   # 16 GB Mac Mini ceiling; 5 stalls clone boot (docs/running-t
 default:
     @just --list
 
+# swift-format: Xcode's on macOS, the toolchain's `swift format` on Linux.
+swift_format := if os() == "linux" { "swift format" } else { "xcrun swift-format" }
+
 # --- quality gates ---------------------------------------------------------
 format:
-    xcrun swift-format format --in-place --recursive --configuration {{root}}/.swift-format {{package}}/Sources {{package}}/Tests {{root}}/SmartTubeApp/Sources {{root}}/SmartTubeApp/UITests "{{root}}/SmartTubeApp/Smart Tube"
+    {{swift_format}} format --in-place --recursive --configuration {{root}}/.swift-format {{package}}/Sources {{package}}/Tests {{root}}/SmartTubeApp/Sources {{root}}/SmartTubeApp/UITests "{{root}}/SmartTubeApp/Smart Tube"
 
 format-check:
-    xcrun swift-format lint --strict --recursive --configuration {{root}}/.swift-format {{package}}/Sources {{package}}/Tests {{root}}/SmartTubeApp/Sources {{root}}/SmartTubeApp/UITests "{{root}}/SmartTubeApp/Smart Tube"
+    {{swift_format}} lint --strict --recursive --configuration {{root}}/.swift-format {{package}}/Sources {{package}}/Tests {{root}}/SmartTubeApp/Sources {{root}}/SmartTubeApp/UITests "{{root}}/SmartTubeApp/Smart Tube"
 
 lint:
     cd {{root}} && swiftlint lint --strict --baseline .swiftlint.baseline --config .swiftlint.yml
@@ -79,3 +82,16 @@ metrics:
     @echo "XCTSkip:"; grep -rho 'XCTSkip' {{root}}/SmartTubeApp/UITests | wc -l
     @echo ".shared reads in Views:"; grep -rho '\.shared\b' --include='*.swift' {{package}}/Sources/SmartTubeIOS/Views | wc -l
     @echo "mirror tests:"; grep -rli 'mirror' {{package}}/Tests | wc -l
+
+# --- Linux (omarchy-apple-dev + x86sim; docs/how-to/build-on-linux.md) -------
+# tvOS app for the simulator: SmartTubeApp/omarchy-xtool/xtool/Smart Tube.app
+linux-build-tvos:
+    cd {{root}}/SmartTubeApp/omarchy-xtool && xtool dev build -c debug --triple arm64-apple-tvos-simulator
+
+# Signed tvOS app for the Apple TV (xtool's team and profile).
+linux-build-tvos-device:
+    cd {{root}}/SmartTubeApp/omarchy-xtool && xtool dev build --sign -c release --triple arm64-apple-tvos
+
+# Unit tests in an x86sim Apple TV (X86SIM_ROOT must point at the x86sim checkout).
+linux-test:
+    {{root}}/scripts/linux-test.sh

@@ -12,10 +12,15 @@ private func json(_ text: String) -> Data { Data(text.utf8) }
 @Suite("ExternalID — Twitch and Kick ids next to YouTube's")
 struct ExternalIDTests {
     @Test func roundTrips() {
-        #expect(ExternalID.parse(ExternalID.live(.twitch, "SomeStreamer"))
-            == ExternalID.Parsed(platform: .twitch, kind: .live, key: "somestreamer"))
-        #expect(ExternalID.parse(ExternalID.vod(.kick, "716d63b6-afa9")) == ExternalID.Parsed(platform: .kick, kind: .vod, key: "716d63b6-afa9"))
-        #expect(ExternalID.parse(ExternalID.channel(.kick, "some-slug")) == ExternalID.Parsed(platform: .kick, kind: .channel, key: "some-slug"))
+        #expect(
+            ExternalID.parse(ExternalID.live(.twitch, "SomeStreamer"))
+                == ExternalID.Parsed(platform: .twitch, kind: .live, key: "somestreamer"))
+        #expect(
+            ExternalID.parse(ExternalID.vod(.kick, "716d63b6-afa9"))
+                == ExternalID.Parsed(platform: .kick, kind: .vod, key: "716d63b6-afa9"))
+        #expect(
+            ExternalID.parse(ExternalID.channel(.kick, "some-slug"))
+                == ExternalID.Parsed(platform: .kick, kind: .channel, key: "some-slug"))
     }
 
     @Test func youTubeIdsStayYouTube() {
@@ -84,7 +89,8 @@ struct TwitchParsingTests {
 
     @Test func searchSkipsNonUsers() {
         let data = json(
-            #"{"data":{"searchFor":{"channels":{"edges":[{"item":{"login":"a","displayName":"A","stream":null}},{"item":{}}]}}}}"#)
+            #"{"data":{"searchFor":{"channels":{"edges":[{"item":{"login":"a","displayName":"A","stream":null}},{"item":{}}]}}}}"#
+        )
         #expect(TwitchClient.parseSearch(data).map(\.id) == ["twitch:a"])
     }
 
@@ -118,7 +124,8 @@ struct KickParsingTests {
     }
 
     @Test func offlineChannelHasNoStream() throws {
-        let data = json(#"{"slug":"quiet","user":{"username":"Quiet"},"livestream":null,"playback_url":"https://x/a.m3u8"}"#)
+        let data = json(
+            #"{"slug":"quiet","user":{"username":"Quiet"},"livestream":null,"playback_url":"https://x/a.m3u8"}"#)
         #expect(try #require(KickClient.parseChannel(data)).live == nil)
         #expect(KickClient.parsePlaybackURL(data, vod: false) == nil)
     }
@@ -143,7 +150,9 @@ struct KickParsingTests {
         let videos = KickClient.parseVideos(data, slug: "s")
         #expect(videos.map(\.id) == ["kick:vod:716d63b6"])
         #expect(videos.first?.duration == 83735 && videos.first?.viewCount == 147703)
-        #expect(KickClient.parsePlaybackURL(json(#"{"source":"https://stream.kick.com/v.m3u8"}"#), vod: true)?.path == "/v.m3u8")
+        #expect(
+            KickClient.parsePlaybackURL(json(#"{"source":"https://stream.kick.com/v.m3u8"}"#), vod: true)?.path
+                == "/v.m3u8")
     }
 
     @Test func searchMarksLiveChannels() {

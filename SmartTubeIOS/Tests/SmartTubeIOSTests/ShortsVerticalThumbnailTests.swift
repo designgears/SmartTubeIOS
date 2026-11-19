@@ -193,7 +193,9 @@ struct ShortsVerticalThumbnailTests {
             ],
             "header": [
                 "tileHeaderRenderer": [
-                    "thumbnail": ["thumbnails": [["url": "https://example.com/live.jpg", "width": 480, "height": 360]]],
+                    "thumbnail": [
+                        "thumbnails": [["url": "https://example.com/live.jpg", "width": 480, "height": 360]]
+                    ],
                     "thumbnailOverlays": [
                         ["thumbnailOverlayTimeStatusRenderer": ["style": "LIVE", "text": ["simpleText": "LIVE"]]]
                     ],
