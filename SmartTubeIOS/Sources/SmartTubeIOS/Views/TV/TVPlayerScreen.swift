@@ -43,7 +43,6 @@ struct TVPlayerScreen: View {
                 }
                 if showsChat {
                     TVChatPanel(feed: chat)
-                        .frame(maxWidth: .infinity, alignment: .trailing)
                         .ignoresSafeArea()
                         .transition(.move(edge: .trailing))
                 }
@@ -85,6 +84,9 @@ struct TVPlayerScreen: View {
         model.updateAuthToken(auth.accessToken)
         model.load(video: video)  // applies this channel's remembered speed (1× for music)
         vm = model
+        // UI tests: `--uitesting-show-chat` opens a Twitch/Kick stream's chat straight away.
+        let arguments = ProcessInfo.processInfo.arguments
+        if arguments.contains("--uitesting"), arguments.contains("--uitesting-show-chat") { showsChat = true }
     }
 
     private func menuState(_ vm: PlaybackViewModel) -> TVPlayerMenuState {
