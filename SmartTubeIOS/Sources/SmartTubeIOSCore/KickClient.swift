@@ -53,17 +53,32 @@ public actor KickClient {
         return Self.parseVideos(data, slug: slug)
     }
 
+    /// Channels matching `text`. Kick's search answer has no avatars and no stream details, so
+    /// the first `detailedResults` are looked up in full.
     public func search(_ text: String) async throws -> [ExternalChannel] {
         var components = URLComponents(string: "\(Self.base)/search")
         components?.queryItems = [URLQueryItem(name: "searched_word", value: text)]
         guard let url = components?.url, let data = try await get(url, allowNotFound: false) else { return [] }
-        return Self.parseSearch(data)
+        var found = Self.parseSearch(data)
+        let slugs = found.prefix(Self.detailedResults).compactMap { ExternalID.parse($0.id)?.key }
+        let detailed = await withTaskGroup(of: ExternalChannel?.self) { group in
+            for slug in slugs { group.addTask { try? await self.channel(slug: slug) } }
+            var byId: [String: ExternalChannel] = [:]
+            for await channel in group { if let channel { byId[channel.id] = channel } }
+            return byId
+        }
+        for index in found.indices { if let full = detailed[found[index].id] { found[index] = full } }
+        return found
     }
+
+    static let detailedResults = 12
 
     /// The HLS master URL for a live stream or past broadcast.
     public func playbackURL(for target: ExternalID.Parsed) async throws -> URL {
-        let path = target.kind == .vod ? "/v1/video/\(Self.escaped(target.key))" : "/v2/channels/\(Self.escaped(target.key))"
-        guard let data = try await get(path, allowNotFound: true), let url = Self.parsePlaybackURL(data, vod: target.kind == .vod)
+        let path =
+            target.kind == .vod ? "/v1/video/\(Self.escaped(target.key))" : "/v2/channels/\(Self.escaped(target.key))"
+        guard let data = try await get(path, allowNotFound: true),
+            let url = Self.parsePlaybackURL(data, vod: target.kind == .vod)
         else {
             throw ExternalStreamError.unavailable(
                 target.kind == .vod ? "This Kick broadcast isn't available." : "This Kick channel isn't live.")

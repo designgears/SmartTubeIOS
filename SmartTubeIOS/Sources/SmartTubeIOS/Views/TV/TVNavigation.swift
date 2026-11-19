@@ -14,6 +14,8 @@ enum TVTab: Hashable {
     case watchLater
     case playlists
     case channels
+    /// Twitch or Kick: followed channels, who's live, search.
+    case streaming(StreamPlatform)
     case queue
     case accounts
     case settings
@@ -25,6 +27,7 @@ enum TVTab: Hashable {
 enum TVRoute: Hashable {
     case channel(id: String, title: String)
     case playlist(id: String, title: String)
+    case streamingSearch(StreamPlatform)
 }
 
 // MARK: - TVPlayRequest
@@ -109,8 +112,12 @@ struct TVTabStack<Content: View>: View {
                 content()
                     .navigationDestination(for: TVRoute.self) { route in
                         switch route {
+                        case .channel(let id, let title) where StreamPlatform(id: id) != .youtube:
+                            TVStreamingChannelView(channelId: id, title: title)
                         case .channel(let id, let title):
                             TVChannelView(channelId: id, title: title)
+                        case .streamingSearch(let platform):
+                            TVStreamingSearchView(platform: platform)
                         case .playlist(let id, let title):
                             TVPlaylistView(playlistId: id, title: title)
                         }

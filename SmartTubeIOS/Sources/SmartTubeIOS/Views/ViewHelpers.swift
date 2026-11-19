@@ -185,6 +185,8 @@ enum AppSymbol {
     static let gaming = "gamecontroller.fill"
     static let history = "clock.arrow.circlepath"
     static let live = "dot.radiowaves.left.and.right"
+    static let twitch = "t.square.fill"
+    static let kick = "k.square.fill"
     static let more = "ellipsis.circle"
     static let music = "music.note"
     static let news = "newspaper.fill"

@@ -138,7 +138,13 @@ extension PlaybackViewModel {
     /// Twitch and Kick: a fresh HLS URL (Twitch's tokens expire within minutes), then direct
     /// playback. None of YouTube's extras run: no PO token, SponsorBlock, DeArrow, related
     /// videos or watch-history reporting. A past broadcast resumes where it was left.
-    func loadExternal(video: Video) async {
+    func loadExternal(video incoming: Video) async {
+        // A live id is live even when the video arrived bare (a deep link, a restored queue).
+        var video = incoming
+        if ExternalID.parse(video.id)?.kind == .live, !video.isLive {
+            video.isLive = true
+            if currentVideo?.id == video.id { currentVideo?.isLive = true }
+        }
         relatedVideos = []
         hasNext = false
         sponsorSegments = []

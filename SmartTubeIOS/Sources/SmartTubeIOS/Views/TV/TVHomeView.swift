@@ -158,9 +158,12 @@ struct TVHomeView: View {
         // Who's live, while Home is up: on arrival, after the player closes, and every few
         // minutes (not during playback).
         .task(id: TVLiveRefreshKey(token: auth.accessToken, playerOpen: navigator.nowPlaying != nil)) {
-            guard isSignedIn, let token = auth.accessToken, navigator.nowPlaying == nil else { return }
+            guard navigator.nowPlaying == nil else { return }
             while !Task.isCancelled {
-                await SubscriptionLiveStore.shared.refresh(api: api, token: token)
+                if isSignedIn, let token = auth.accessToken {
+                    await SubscriptionLiveStore.shared.refresh(api: api, token: token)
+                }
+                await ExternalLiveStore.shared.refresh(channels: ExternalFollowStore.shared.all)
                 try? await Task.sleep(for: Self.liveRefreshInterval)
             }
         }
@@ -203,9 +206,11 @@ struct TVHomeView: View {
     /// What the Live Now shelf shows: subscribed channels' live streams (never hidden as
     /// watched — they're happening now). Each card plays the stream.
     private var liveNow: [Video] {
-        guard isSignedIn else { return [] }
+        // Followed Twitch and Kick channels need no YouTube account.
+        let streaming = ExternalLiveStore.shared.videos
+        guard isSignedIn else { return streaming }
         let fromFeed = (subscriptionsSection?.videos ?? []).filter(\.isLive)
-        return (SubscriptionLiveStore.shared.videos + fromFeed)
+        return (SubscriptionLiveStore.shared.videos + fromFeed + streaming)
             .filter { !($0.isShort && hideShorts) }.uniquedByID()
     }
 

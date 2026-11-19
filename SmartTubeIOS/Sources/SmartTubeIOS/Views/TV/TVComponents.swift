@@ -59,11 +59,18 @@ struct TVVideoThumbnail: View {
                             Spacer()
                             ZStack(alignment: .leading) {
                                 Rectangle().fill(.white.opacity(0.35))
-                                Rectangle().fill(AppColor.watched(store)).frame(width: geo.size.width * min(progress, 1))
+                                Rectangle().fill(AppColor.watched(store)).frame(
+                                    width: geo.size.width * min(progress, 1))
                             }
                             .frame(height: 6)
                         }
                     }
+                }
+                // Live rows mix YouTube, Twitch and Kick (Home's Live Now).
+                if video.isExternal, video.isLive {
+                    TVPlatformBadge(platform: video.platform)
+                        .padding(12)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 }
                 HStack {
                     if video.isLive {
@@ -80,6 +87,20 @@ struct TVVideoThumbnail: View {
                 .frame(maxHeight: .infinity, alignment: .bottom)
             }
         }
+    }
+}
+
+/// "Twitch" / "Kick" in the platform's color, on their cards.
+struct TVPlatformBadge: View {
+    let platform: StreamPlatform
+
+    var body: some View {
+        Text(platform.title)
+            .font(.caption2.weight(.heavy))
+            .foregroundStyle(AppColor.onPlatform(platform))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(AppColor.platform(platform), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
     }
 }
 
@@ -169,7 +190,7 @@ struct TVVideoContextMenu: View {
         if let channelId = video.channelId, !channelId.isEmpty {
             Button("Go to Channel", systemImage: AppSymbol.personSquare) { navigator.openChannel(of: video) }
         }
-        if auth.isSignedIn {
+        if auth.isSignedIn, !video.isExternal {
             Button("Save to Watch Later", systemImage: AppSymbol.clock) {
                 Task { _ = try? await api.addToWatchLater(videoId: video.id) }
             }

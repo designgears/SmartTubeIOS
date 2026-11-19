@@ -69,6 +69,12 @@ private struct TVSidebarTabs: View {
             Tab("Channels", systemImage: AppSymbol.accountsFill, value: TVTab.channels) {
                 TVTabStack(tab: .channels) { TVChannelsView() }
             }
+            Tab("Twitch", systemImage: AppSymbol.twitch, value: TVTab.streaming(.twitch)) {
+                TVTabStack(tab: .streaming(.twitch)) { TVStreamingView(platform: .twitch) }
+            }
+            Tab("Kick", systemImage: AppSymbol.kick, value: TVTab.streaming(.kick)) {
+                TVTabStack(tab: .streaming(.kick)) { TVStreamingView(platform: .kick) }
+            }
             Tab(value: TVTab.search, role: .search) {
                 TVTabStack(tab: .search) { TVSearchView() }
             }
@@ -140,6 +146,12 @@ private struct TVLegacyTabs: View {
             TVTabStack(tab: .channels) { TVChannelsView() }
                 .tabItem { Label("Channels", systemImage: AppSymbol.accountsFill) }
                 .tag(TVTab.channels)
+            TVTabStack(tab: .streaming(.twitch)) { TVStreamingView(platform: .twitch) }
+                .tabItem { Label("Twitch", systemImage: AppSymbol.twitch) }
+                .tag(TVTab.streaming(.twitch))
+            TVTabStack(tab: .streaming(.kick)) { TVStreamingView(platform: .kick) }
+                .tabItem { Label("Kick", systemImage: AppSymbol.kick) }
+                .tag(TVTab.streaming(.kick))
             TVTabStack(tab: .search) { TVSearchView() }
                 .tabItem { Label("Search", systemImage: AppSymbol.search) }
                 .tag(TVTab.search)
