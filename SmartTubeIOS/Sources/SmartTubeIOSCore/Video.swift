@@ -164,7 +164,9 @@ public extension Video {
     /// Ordered static CDN fallbacks to try when `thumbnailURL` fails.
     /// Priority: sddefault (640×480) → hqdefault (480×360) → mqdefault (320×180).
     var thumbnailFallbackURLs: [URL] {
-        [sdThumbnailURL, highQualityThumbnailURL, mqThumbnailURL].compactMap { $0 }
+        // YouTube's image server only knows YouTube ids; Twitch and Kick bring `thumbnailURL`.
+        guard !isExternal else { return [] }
+        return [sdThumbnailURL, highQualityThumbnailURL, mqThumbnailURL].compactMap { $0 }
     }
 
     /// 1280×720; only exists when the video was uploaded in HD (404 otherwise).
@@ -174,7 +176,8 @@ public extension Video {
 
     /// Fallbacks after `maxResThumbnailURL`: hq720 (1280×720, 16:9) → standard chain.
     var highResThumbnailFallbackURLs: [URL] {
-        [URL(string: "https://i.ytimg.com/vi/\(id)/hq720.jpg")].compactMap { $0 } + thumbnailFallbackURLs
+        guard !isExternal else { return [] }
+        return [URL(string: "https://i.ytimg.com/vi/\(id)/hq720.jpg")].compactMap { $0 } + thumbnailFallbackURLs
     }
 
     /// Portrait (9:16) thumbnail used for Shorts cards.

@@ -135,8 +135,8 @@ extension PlaybackViewModel {
         }
 
         // #150: on-device history, kept alongside the account reporting (which YouTube
-        // doesn't always credit for device-code sign-in).
-        if settings.historyState == .enabled {
+        // doesn't always credit for device-code sign-in). YouTube videos only.
+        if settings.historyState == .enabled, !video.isExternal {
             LocalWatchHistoryStore.shared.record(video)
         }
 
@@ -404,6 +404,13 @@ extension PlaybackViewModel {
         updateNowPlayingInfo()
         #endif
 
+        // Twitch and Kick play their own HLS; nothing below (PO token, YouTube clients,
+        // fallbacks, SponsorBlock, related videos) applies to them.
+        if video.isExternal {
+            await loadExternal(video: video)
+            return
+        }
+
         // Fetch the BotGuard PO token before the primary stream attempt.
         // Awaited (with a 2 s safety timeout) so api.hasPoToken(for:) returns true during
         // the rqh=1 adaptive stream check in tryAllStreams — preventing an unnecessary
@@ -476,118 +483,7 @@ extension PlaybackViewModel {
             if localURL.path.hasPrefix(downloadsDir),
                 FileManager.default.fileExists(atPath: localURL.path)
             {
-                let item = AVPlayerItem(url: localURL)
-                item.audioTimePitchAlgorithm = .spectral
-                // Wire up observers BEFORE replaceCurrentItem (task-80 rule).
-                itemObserverTask?.cancel()
-                itemObserverTask = Task { [weak self] in
-                    for await status in item.statusStream {
-                        guard let self, !Task.isCancelled else { return }
-                        switch status {
-                        case .readyToPlay:
-                            playerLog.notice(
-                                "[benchmark] readyToPlay — local-file — videoId=\(video.id) title=\(video.title)")
-                            self.loadAudioTracks(from: item)
-                            self.isLoading = false
-                        case .failed:
-                            playerLog.error("❌ local-file AVPlayerItem failed: \(String(describing: item.error))")
-                            self.error = item.error
-                        case .unknown:
-                            break
-                        @unknown default:
-                            break
-                        }
-                    }
-                }
-                player.replaceCurrentItem(with: item)
-                endObserverTask?.cancel()
-                endObserverTask = Task { [weak self] in
-                    let notifications = NotificationCenter.default.notifications(
-                        named: AVPlayerItem.didPlayToEndTimeNotification,
-                        object: item
-                    )
-                    for await _ in notifications {
-                        guard let self, !Task.isCancelled else { return }
-                        self.handlePlaybackEnd()
-                    }
-                }
-                stallObserverTask?.cancel()
-                stallObserverTask = Task { @MainActor [weak self] in
-                    let notifications = NotificationCenter.default.notifications(
-                        named: AVPlayerItem.playbackStalledNotification,
-                        object: item
-                    )
-                    for await _ in notifications {
-                        guard let self, !Task.isCancelled else { return }
-                        self.stallCount += 1
-                        let t = Int(self.currentTime)
-                        playerLog.notice(
-                            "[stall] AVPlayerItemPlaybackStalled at t=\(t)s stall#\(self.stallCount) video=\(self.currentVideo?.id ?? "unknown")"
-                        )
-                        let stallError = NSError(
-                            domain: "SmartTube.PlaybackStall",
-                            code: 0,
-                            userInfo: [
-                                NSLocalizedDescriptionKey:
-                                    "AVPlayerItemPlaybackStalled at t=\(t)s (stall #\(self.stallCount))"
-                            ]
-                        )
-                        playerLog.recordNonFatal(
-                            stallError,
-                            userInfo: [
-                                "video_id": self.currentVideo?.id ?? "unknown",
-                                "stall_at_time": String(t),
-                                "stall_count": String(self.stallCount),
-                                "video_duration": String(Int(self.duration)),
-                                "stall_trigger": "AVPlayerItemPlaybackStalled",
-                            ])
-                        // Stall recovery (#193): wait 2 s for AVPlayer to self-heal;
-                        // if still stalled, nudge the pipeline with a near-zero seek
-                        // + explicit rate restore. Capped at 3 attempts per item.
-                        let recoveryCount = self.stallCount
-                        if recoveryCount <= 3 {
-                            Task { @MainActor [weak self] in
-                                try? await Task.sleep(nanoseconds: 2_000_000_000)
-                                guard let self, self.isPlaying, self.player.rate == 0,
-                                    !self.isQualityChangePending
-                                else { return }
-                                let seekT = self.currentTime
-                                playerLog.notice(
-                                    "[stall] recovery#\(recoveryCount): seeking to \(seekT)s to flush pipeline")
-                                self.player.seek(
-                                    to: CMTime(seconds: seekT, preferredTimescale: 600),
-                                    toleranceBefore: .zero,
-                                    toleranceAfter: CMTime(seconds: 1, preferredTimescale: 600)
-                                ) { [weak self] _ in
-                                    Task { @MainActor [weak self] in
-                                        guard let self, self.isPlaying else { return }
-                                        self.player.rate = Float(self.settings.playbackSpeed)
-                                        playerLog.notice("[stall] recovery#\(recoveryCount): rate restored")
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                #if canImport(UIKit)
-                setupRemoteCommandCenter()
-                do {
-                    try AVAudioSession.sharedInstance().setActive(true)
-                } catch {
-                    playerLog.error("[loadAsync] local: AVAudioSession setActive failed: \(error.localizedDescription)")
-                }
-                #endif
-                player.rate = Float(settings.playbackSpeed)
-                isPlaying = true
-                // Downloaded videos have no related videos — clear any stale state from a
-                // previous YouTube session so autoplay does not fire a YouTube video when
-                // the download ends. (Bug #224: wrong video played after local file ends.)
-                relatedVideos = []
-                hasNext = false
-                #if canImport(UIKit)
-                UIApplication.shared.isIdleTimerDisabled = true
-                updateNowPlayingInfo()
-                #endif
+                startDirectPlayback(AVPlayerItem(url: localURL), video: video, label: "local-file")
                 playerLog.notice("[loadAsync] local-file fast path: playing \(localURL.lastPathComponent)")
                 return
             }

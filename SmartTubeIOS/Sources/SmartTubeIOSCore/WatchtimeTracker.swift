@@ -108,6 +108,8 @@ public final class WatchtimeTracker {
             )
             await VideoStateStore.shared.save(videoId: oldVideoId, position: flushPosition, duration: flushDuration)
             await WatchedStore.shared.record(videoId: oldVideoId, position: flushPosition, duration: flushDuration)
+            // Twitch and Kick keep their resume point and watched mark, but aren't YouTube's.
+            guard StreamPlatform(id: oldVideoId) == .youtube else { return }
             // The playback ping must precede the watchtime ping — YouTube ignores
             // standalone watchtime pings.
             await api.reportPlaybackStarted(
@@ -217,6 +219,8 @@ public final class WatchtimeTracker {
 
         await VideoStateStore.shared.save(videoId: vid, position: position, duration: duration)
         WatchedStore.shared.record(videoId: vid, position: position, duration: duration)
+        // Twitch and Kick keep their resume point and watched mark, but aren't YouTube's.
+        guard StreamPlatform(id: vid) == .youtube else { return }
 
         if needsNewRecord || isFinal {
             trackerLog.notice(

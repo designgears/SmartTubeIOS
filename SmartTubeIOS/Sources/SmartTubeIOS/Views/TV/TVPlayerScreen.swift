@@ -87,7 +87,8 @@ struct TVPlayerScreen: View {
             hasPrevious: vm.hasPrevious,
             skipLabel: vm.currentToastSegment.map { "Skip \($0.category.tvLabel)" },
             hasChannel: (vm.currentVideo ?? video).channelId != nil,
-            subtitle: Self.subtitle(vm: vm, fallback: video)
+            subtitle: Self.subtitle(vm: vm, fallback: video),
+            platform: (vm.currentVideo ?? video).platform
         )
     }
 
@@ -168,6 +169,8 @@ struct TVPlayerMenuState: Equatable {
     var hasChannel: Bool
     /// "Channel · 1.5M views · 9 hours ago" — the line under the title in the transport bar.
     var subtitle: String
+    /// Twitch and Kick have no likes, and no YouTube formats to pick from.
+    var platform: StreamPlatform = .youtube
 }
 
 struct TVPlayerActions {
@@ -468,14 +471,16 @@ struct TVNativePlayer: UIViewControllerRepresentable {
 
         private func menus(for state: TVPlayerMenuState) -> [UIMenuElement] {
             var items: [UIMenuElement] = []
+            let isYouTube = state.platform == .youtube
 
-            items.append(
-                UIAction(
-                    title: state.isLiked ? "Liked" : "Like",
-                    image: UIImage(systemName: state.isLiked ? AppSymbol.thumbsUpFill : AppSymbol.thumbsUp)
-                ) { [weak self] _ in self?.actions?.like() })
-
-            items.append(qualityMenu(for: state))
+            if isYouTube {
+                items.append(
+                    UIAction(
+                        title: state.isLiked ? "Liked" : "Like",
+                        image: UIImage(systemName: state.isLiked ? AppSymbol.thumbsUpFill : AppSymbol.thumbsUp)
+                    ) { [weak self] _ in self?.actions?.like() })
+                items.append(qualityMenu(for: state))
+            }
 
             if !state.captions.isEmpty {
                 var children: [UIMenuElement] = [
@@ -518,12 +523,14 @@ struct TVNativePlayer: UIViewControllerRepresentable {
                         }))
             }
 
-            var more: [UIMenuElement] = [
-                UIAction(
-                    title: state.isDisliked ? "Disliked" : "Dislike",
-                    image: UIImage(systemName: state.isDisliked ? AppSymbol.thumbsDownFill : AppSymbol.thumbsDown)
-                ) { [weak self] _ in self?.actions?.dislike() }
-            ]
+            var more: [UIMenuElement] = []
+            if isYouTube {
+                more.append(
+                    UIAction(
+                        title: state.isDisliked ? "Disliked" : "Dislike",
+                        image: UIImage(systemName: state.isDisliked ? AppSymbol.thumbsDownFill : AppSymbol.thumbsDown)
+                    ) { [weak self] _ in self?.actions?.dislike() })
+            }
             if state.hasPrevious {
                 more.append(
                     UIAction(
@@ -542,7 +549,9 @@ struct TVNativePlayer: UIViewControllerRepresentable {
                         title: "Go to Channel", image: UIImage(systemName: AppSymbol.personSquare),
                         handler: { [weak self] _ in self?.actions?.openChannel() }))
             }
-            items.append(UIMenu(title: "More", image: UIImage(systemName: AppSymbol.more), children: more))
+            if !more.isEmpty {
+                items.append(UIMenu(title: "More", image: UIImage(systemName: AppSymbol.more), children: more))
+            }
             return items
         }
 

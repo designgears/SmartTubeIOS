@@ -210,7 +210,8 @@ public final class PlaybackViewModel {
 
     /// People watching a live video now (the watch page's count). Nil when not live.
     public var watchingCount: Int? {
-        guard isLive, let count = videoDetails?.viewCount, count > 0 else { return nil }
+        // Twitch and Kick: the viewer count from when the stream was listed.
+        guard isLive, let count = videoDetails?.viewCount ?? currentVideo?.viewCount, count > 0 else { return nil }
         return count
     }
 
