@@ -26,6 +26,19 @@ struct ExternalFollowStoreTests {
         #expect(relaunched.all.map(\.id) == ["kick:c", "twitch:b"])
     }
 
+    /// Each profile has its own follows: switching parks one profile's and brings the other's.
+    @Test func followsBelongToTheProfile() {
+        let suite = defaults()
+        let store = ExternalFollowStore(defaults: suite)
+        store.follow(Channel(id: "kick:jo", title: "Jo's"))
+        store.switchAccountData(from: "jo", to: "sam")
+        #expect(store.all.isEmpty)
+        store.follow(Channel(id: "twitch:sam", title: "Sam's"))
+        store.switchAccountData(from: "sam", to: "jo")
+        #expect(store.all.map(\.id) == ["kick:jo"])
+        #expect(ExternalFollowStore(defaults: suite).all.map(\.id) == ["kick:jo"])  // across launches
+    }
+
     @Test func updateRefreshesNameAndAvatar() {
         let store = ExternalFollowStore(defaults: defaults())
         store.follow(Channel(id: "kick:a", title: "old"))

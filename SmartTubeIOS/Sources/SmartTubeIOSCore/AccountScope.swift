@@ -79,6 +79,8 @@ public enum AccountScope {
         await CurrentQueueStore.shared.switchAccountData(from: outgoing, to: incoming)
         await RSSFeedStore.shared.switchAccountData(from: outgoing, to: incoming)
         await ContinueWatchingStore.shared.switchAccountData(from: outgoing, to: incoming)
+        ExternalFollowStore.shared.switchAccountData(from: outgoing, to: incoming)
+        ExternalLiveStore.shared.reset()
         // Prefetched player/next responses (memory and disk) were fetched for the old account.
         await VideoPreloadCache.shared.removeAll()
 

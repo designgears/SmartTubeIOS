@@ -35,6 +35,8 @@ public final class ExternalLiveStore {
     private var lastRefresh: Date?
     private var lastFollows: Set<String> = []
     private var running: Task<Void, Never>?
+    /// Bumped by `reset`: a read started before it doesn't land.
+    private var generation = 0
 
     init(sources: Sources = .live, now: @escaping () -> Date = Date.init) {
         self.sources = sources
@@ -43,6 +45,15 @@ public final class ExternalLiveStore {
 
     public func videos(_ platform: StreamPlatform) -> [Video] {
         videos.filter { $0.platform == platform }
+    }
+
+    /// Another profile's follows are coming: nothing of this one's stays on screen.
+    public func reset() {
+        generation += 1
+        running = nil
+        videos = []
+        lastRefresh = nil
+        lastFollows = []
     }
 
     /// The channel's live stream, if it's live.
@@ -59,15 +70,18 @@ public final class ExternalLiveStore {
             return
         }
         if follows == lastFollows, let lastRefresh, now().timeIntervalSince(lastRefresh) < Self.freshness { return }
+        let generation = generation
         let read = Task { await self.read(channels) }
         running = read
         await read.value
+        guard generation == self.generation else { return }  // reset meanwhile
         running = nil
         lastFollows = follows
         lastRefresh = now()
     }
 
     private func read(_ channels: [Channel]) async {
+        let generation = generation
         let logins = channels.compactMap { channel -> String? in
             guard let parsed = ExternalID.parse(channel.id), parsed.platform == .twitch else { return nil }
             return parsed.key
@@ -85,7 +99,10 @@ public final class ExternalLiveStore {
             return found
         }
         let named = Dictionary(channels.map { ($0.id, $0.title) }, uniquingKeysWith: { first, _ in first })
-        videos = (await twitch + kick)
+        let found = await twitch + kick
+        guard generation == self.generation else { return }
+        videos =
+            found
             .map { video in
                 // Kick's live answer has no channel name; the followed channel has it.
                 var video = video

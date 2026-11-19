@@ -80,6 +80,9 @@ public final class AuthService {
     var accountToRestoreOnCancel: String?
     /// True during `switchToProfile`: the live YouTube session is still the outgoing profile's.
     var isSwitchingProfile = false
+    /// Companion accounts (`AuthService+Companions`): token refreshes under way, and their APIs.
+    @ObservationIgnored var companionRefreshes: [String: Task<String?, Never>] = [:]
+    @ObservationIgnored var companionAPICache: [String: InnerTubeAPI] = [:]
     /// Bumped on every account change. Async auth work (token refresh, user info, cookies,
     /// device-code exchange) captures it and drops its result if the account changed meanwhile,
     /// so a late response for the previous account is never applied to the new one.
@@ -119,6 +122,7 @@ public final class AuthService {
     public init() {
         tokenManager = TokenManager()
         loadFromKeychain()
+        installCompanionProvider()
         // UI-testing override: treat the session as signed-in so the home feed
         // renders its full shelves (including the injected Shorts row) without
         // requiring real keychain credentials.

@@ -114,7 +114,9 @@ struct ProfileEditorView: View {
         } header: {
             Text("YouTube")
         } footer: {
-            Text("The main account (✓) plays videos and keeps watch history, likes and Watch Later.")
+            Text(
+                "Subscriptions, channels and live streams of every account are combined. The main account (✓) "
+                    + "plays videos and keeps watch history, likes and Watch Later.")
         }
     }
 }

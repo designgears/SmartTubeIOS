@@ -3,9 +3,9 @@ import Observation
 
 // MARK: - ExternalFollowStore
 
-/// Twitch and Kick channels followed in SmartTube, kept on the device. Kick has no sign-in a
-/// TV can use, so these are its follows; for Twitch they are the follows until an account is
-/// signed in (then the account's follows are added).
+/// Twitch and Kick channels followed in SmartTube, kept on the device per profile. Kick has no
+/// sign-in a TV can use, so these are its follows; for Twitch they are the follows until an
+/// account is signed in (then the account's follows are added).
 @MainActor
 @Observable
 public final class ExternalFollowStore {
@@ -51,6 +51,20 @@ public final class ExternalFollowStore {
         guard let index = all.firstIndex(where: { $0.id == channel.id }), all[index] != channel else { return }
         all[index] = channel
         save()
+    }
+
+    /// Follows belong to the profile in use (`AccountScope`): parks these under the outgoing
+    /// profile and takes the incoming one's.
+    public func switchAccountData(from outgoing: String?, to incoming: String) {
+        let next = AccountScope.exchange(
+            key: Self.defaultsKey, current: defaults.data(forKey: Self.defaultsKey), outgoing: outgoing,
+            incoming: incoming, defaults: defaults)
+        if let next {
+            defaults.set(next, forKey: Self.defaultsKey)
+        } else {
+            defaults.removeObject(forKey: Self.defaultsKey)
+        }
+        all = (next as? Data).flatMap { try? JSONDecoder().decode([Channel].self, from: $0) } ?? []
     }
 
     private func save() {

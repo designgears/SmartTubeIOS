@@ -15,7 +15,7 @@ public final class SubscriptionLiveStore {
     public static let shared = SubscriptionLiveStore()
 
     /// Feed pages read per refresh.
-    static let pages = 3
+    nonisolated static let pages = 3
     /// A refresh this soon after the last one is skipped.
     static let freshness: TimeInterval = 120
 
@@ -58,21 +58,30 @@ public final class SubscriptionLiveStore {
 
     private func read(api: any InnerTubeAPIProtocol, token: String, slot: String) async {
         await api.setAuthToken(token)
+        // The profile's other YouTube accounts' streams join the main one's.
+        async let companions = CompanionAccounts.shared.each { try await Self.liveStreams(api: $0) ?? [] }
+        guard let main = await Self.liveStreams(api: api) else { return }
+        let found = main + (await companions).flatMap { $0 }
+        guard Self.liveSlot == slot else { return }
+        lastRefresh = now()
+        var seen = Set<String>()
+        videos = found.filter { seen.insert($0.id).inserted }
+    }
+
+    /// The live tiles of the first `pages` feed pages; nil when the first page fails.
+    nonisolated private static func liveStreams(api: any InnerTubeAPIProtocol) async -> [Video]? {
         var found: [Video] = []
         var pageToken: String?
-        for page in 0..<Self.pages {
+        for page in 0..<pages {
             guard let group = try? await api.fetchSubscriptions(continuationToken: pageToken) else {
-                if page == 0 { return }
+                if page == 0 { return nil }
                 break
             }
             found += group.videos.filter(\.isLive)
             guard let next = group.nextPageToken, !group.videos.isEmpty else { break }
             pageToken = next
         }
-        guard Self.liveSlot == slot else { return }
-        lastRefresh = now()
-        var seen = Set<String>()
-        videos = found.filter { seen.insert($0.id).inserted }
+        return found
     }
 
     /// The channel's stream, if it's live. Feed tiles name a channel by `UC…` ID or `@handle`,

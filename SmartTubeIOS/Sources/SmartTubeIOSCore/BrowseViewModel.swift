@@ -472,12 +472,11 @@ public final class BrowseViewModel {
 
         case .subscriptions:
             if hasAuthToken {
-                let group = try await api.fetchSubscriptions()
+                let group = try await CompanionAccounts.shared.subscriptions(main: api)
                 if !Task.isCancelled {
                     isAuthRequired = group.videos.isEmpty
                     var deduped = group
                     deduped.videos = deduplicated(group.videos)
-                        .sorted { ($0.publishedAt ?? .distantPast) > ($1.publishedAt ?? .distantPast) }
                     videoGroups = deduped.videos.isEmpty ? [] : [deduped]
                 }
             } else {
@@ -527,7 +526,7 @@ public final class BrowseViewModel {
 
         case .channels:
             if hasAuthToken {
-                let channels = try await api.fetchSubscribedChannels()
+                let channels = try await CompanionAccounts.shared.subscribedChannels(main: api)
                 browseLog.notice("channels fetch complete: \(channels.count) channels, isCancelled=\(Task.isCancelled)")
                 if !Task.isCancelled {
                     isAuthRequired = channels.isEmpty
