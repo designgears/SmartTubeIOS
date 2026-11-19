@@ -111,3 +111,49 @@ struct ExternalLiveStoreTests {
         #expect(calls.twitch.count == 3)
     }
 }
+
+// MARK: - ExternalFeedStore
+
+@MainActor
+@Suite("ExternalFeedStore — followed Twitch and Kick broadcasts in Subscriptions")
+struct ExternalFeedStoreTests {
+    nonisolated private static func vod(_ id: String, channel: String, hoursAgo: Double, live: Bool = false) -> Video {
+        Video(
+            id: id, title: id, channelTitle: "raw", channelId: channel,
+            publishedAt: Date(timeIntervalSinceNow: -hoursAgo * 3600), isLive: live)
+    }
+
+    @Test func latestBroadcastsNewestFirstAFewPerChannel() async {
+        let store = ExternalFeedStore(
+            sources: .init(
+                twitch: { _ in
+                    (0..<10).map { Self.vod("twitch:vod:\($0)", channel: "twitch:t", hoursAgo: Double($0) * 10) }
+                },
+                kick: { _ in
+                    [
+                        Self.vod("kick:live:k", channel: "kick:k", hoursAgo: 0, live: true),  // Live Now's
+                        Self.vod("kick:vod:a", channel: "kick:k", hoursAgo: 15),
+                    ]
+                }))
+        await store.refresh(channels: [Channel(id: "twitch:t", title: "Tee"), Channel(id: "kick:k", title: "Kay")])
+        #expect(store.videos.count == ExternalFeedStore.perChannel + 1)
+        #expect(store.videos.prefix(3).map(\.id) == ["twitch:vod:0", "twitch:vod:1", "kick:vod:a"])
+        #expect(store.videos.first?.channelTitle == "Tee")
+        store.reset()
+        #expect(store.videos.isEmpty)
+    }
+
+    /// Broadcasts older than the loaded part of the YouTube feed wait for more of it to load.
+    @Test func blendedIntoAPagedFeed() {
+        let feed = [Self.vod("yt1", channel: "UC1", hoursAgo: 1), Self.vod("yt2", channel: "UC2", hoursAgo: 20)]
+        let external = [
+            Self.vod("twitch:vod:new", channel: "twitch:t", hoursAgo: 5),
+            Self.vod("old", channel: "kick:k", hoursAgo: 90),
+        ]
+        #expect(
+            ExternalFeedStore.blended(feed, with: external, feedIsComplete: false).map(\.id)
+                == ["yt1", "twitch:vod:new", "yt2"])
+        #expect(ExternalFeedStore.blended(feed, with: external, feedIsComplete: true).last?.id == "old")
+        #expect(ExternalFeedStore.blended([], with: external, feedIsComplete: false).count == 2)
+    }
+}

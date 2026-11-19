@@ -29,6 +29,9 @@ struct TVFeedView: View {
     @State private var vm: BrowseViewModel?
     @State private var startedToken: String?? = .none
     @State private var showSignIn = false
+    private var follows: ExternalFollowStore { .shared }
+    private var externalLive: ExternalLiveStore { .shared }
+    private var externalFeed: ExternalFeedStore { .shared }
 
     private var section: BrowseSection { BrowseSection(type: type) }
 
@@ -49,6 +52,14 @@ struct TVFeedView: View {
             startedToken = .some(token)
             if vm == nil { vm = BrowseViewModel(api: api, initialSection: section) }
             if let vm { await tvStartBrowse(vm, section: section, token: token) }
+        }
+        // Subscriptions blend in the profile's Twitch and Kick follows: who's live, and their
+        // latest past broadcasts.
+        .task(id: type == .subscriptions ? follows.all.map(\.id) : []) {
+            guard type == .subscriptions, !follows.all.isEmpty else { return }
+            async let live: Void = externalLive.refresh(channels: follows.all)
+            await externalFeed.refresh(channels: follows.all)
+            await live
         }
     }
 
@@ -105,8 +116,14 @@ struct TVFeedView: View {
     }
 
     private var visibleVideos: [Video] {
-        let all = (vm?.videoGroups.flatMap(\.videos) ?? []).uniquedByID()
-            .hidingWatched(in: type, settings: store.settings)
+        var feed = (vm?.videoGroups.flatMap(\.videos) ?? []).uniquedByID()
+        if type == .subscriptions {
+            let isComplete = vm.map { !$0.isLoading && $0.videoGroups.last?.nextPageToken == nil } ?? false
+            feed =
+                externalLive.videos
+                + ExternalFeedStore.blended(feed, with: externalFeed.videos, feedIsComplete: isComplete)
+        }
+        let all = feed.hidingWatched(in: type, settings: store.settings)
         guard store.settings.hideShorts, type != .shorts else { return all }
         return all.filter { !$0.isShort }
     }
@@ -177,12 +194,19 @@ struct TVChannelsView: View {
     @State private var startedToken: String?? = .none
     @State private var showSignIn = false
     private var live: SubscriptionLiveStore { .shared }
+    private var follows: ExternalFollowStore { .shared }
+    private var externalLive: ExternalLiveStore { .shared }
 
     private let section = BrowseSection(type: .channels)
 
-    /// In the chosen order, live channels first.
+    /// YouTube subscriptions and the profile's Twitch and Kick follows, in the chosen order,
+    /// live channels first.
     private var channels: [Channel] {
-        store.settings.channelSort.sorted(vm?.subscribedChannels ?? []) { live.isLive($0) }
+        store.settings.channelSort.sorted((vm?.subscribedChannels ?? []) + follows.all, isLive: isLive)
+    }
+
+    private func isLive(_ channel: Channel) -> Bool {
+        channel.platform == .youtube ? live.isLive(channel) : externalLive.liveVideo(of: channel.id) != nil
     }
 
     var body: some View {
@@ -200,8 +224,10 @@ struct TVChannelsView: View {
                             TVChannelCard(
                                 title: channel.title,
                                 thumbnailURL: channel.thumbnailURL,
-                                subtitle: channel.subscriberCount,
-                                isLive: live.isLive(channel)
+                                subtitle: channel.platform == .youtube
+                                    ? channel.subscriberCount : channel.platform.title,
+                                isLive: isLive(channel),
+                                platform: channel.platform
                             ) {
                                 navigator.open(.channel(id: channel.id, title: channel.title))
                             }
@@ -245,6 +271,7 @@ struct TVChannelsView: View {
         .task(id: auth.accessToken) {
             if auth.isSignedIn, let token = auth.accessToken { await live.refresh(api: api, token: token) }
         }
+        .task(id: follows.all.map(\.id)) { await externalLive.refresh(channels: follows.all) }
     }
 
     private var sortMenu: some View {

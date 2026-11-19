@@ -66,8 +66,8 @@ struct TVVideoThumbnail: View {
                         }
                     }
                 }
-                // Live rows mix YouTube, Twitch and Kick (Home's Live Now).
-                if video.isExternal, video.isLive {
+                // Rows mix YouTube, Twitch and Kick (Live Now, Subscriptions, Channels).
+                if video.isExternal {
                     TVPlatformBadge(platform: video.platform)
                         .padding(12)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
