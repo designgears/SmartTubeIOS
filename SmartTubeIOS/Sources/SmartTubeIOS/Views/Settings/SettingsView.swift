@@ -38,6 +38,7 @@ public struct SettingsView: View {
             ColorSettingsSection()
             PrivacySettingsSection()
             CommunitySettingsSection()
+            StreamingSettingsSection()
             ParentalControlsSettingsSection()
             #if os(macOS)
             ExperimentalSettingsSection()

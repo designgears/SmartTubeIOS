@@ -26,23 +26,19 @@ struct AppSettingsAppearanceTests {
         #expect(decoded.accentColor == choice)
     }
 
-    @Test("Live and watched-bar colors default to blue, also for settings saved before them")
-    func markColorsDefaultToBlue() throws {
-        let old = try decode("{}")
-        #expect(old.liveColor == .blue)
-        #expect(old.watchedBarColor == .blue)
-        #expect(AppSettings().liveColor == AppSettings.defaultMarkColor)
+    @Test("The watched-bar color defaults to blue, also for settings saved before it")
+    func watchedBarDefaultsToBlue() throws {
+        #expect(try decode("{}").watchedBarColor == .blue)
+        #expect(AppSettings().watchedBarColor == AppSettings.defaultMarkColor)
     }
 
-    @Test("Live and watched-bar colors round-trip independently")
-    func markColorsRoundTrip() throws {
+    @Test("The watched-bar color round-trips; the old live color is ignored")
+    func watchedBarRoundTrips() throws {
         var settings = AppSettings()
-        settings.liveColor = .purple
         settings.watchedBarColor = .green
         let decoded = try JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(settings))
-        #expect(decoded.liveColor == .purple)
         #expect(decoded.watchedBarColor == .green)
-        #expect(try decode(#"{"liveColor": "chartreuse"}"#).liveColor == .blue)
+        #expect(try decode(#"{"liveColor": "purple", "watchedBarColor": "chartreuse"}"#).watchedBarColor == .blue)
     }
 
     @Test("Unknown accent color falls back to system")
@@ -72,7 +68,8 @@ struct AppSettingsAppearanceTests {
 
     @Test("High-res fallback chain starts at hq720 and ends at mqdefault")
     func highResFallbackChain() {
-        let names = Video(id: "abc", title: "t", channelTitle: "c").highResThumbnailFallbackURLs.map(\.lastPathComponent)
+        let names = Video(id: "abc", title: "t", channelTitle: "c").highResThumbnailFallbackURLs.map(
+            \.lastPathComponent)
         #expect(names == ["hq720.jpg", "sddefault.jpg", "hqdefault.jpg", "mqdefault.jpg"])
     }
 }

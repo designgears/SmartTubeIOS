@@ -83,3 +83,6 @@ tmp/
 fabric.properties
 *BAK.java
 hs_err_pid*.log
+
+# Linux builds (xtool / SwiftPM with the darwin Swift SDK)
+.build-tvsim/

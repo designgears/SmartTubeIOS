@@ -98,14 +98,14 @@ public struct AppSettings: Codable {
     public var perDeviceRecommendationsEnabled: Bool
     public var themeName: ThemeName
     public var accentColor: AccentColorChoice
-    /// The default for `liveColor` and `watchedBarColor`, and what `.system` means for them.
+    /// The default for `watchedBarColor`, and what `.system` means for it.
     public static let defaultMarkColor = AccentColorChoice.blue
-    /// LIVE badges, rings and tags, the player's own included.
-    public var liveColor: AccentColorChoice
     /// The bar on a card showing how much of the video has been watched.
     public var watchedBarColor: AccentColorChoice
     /// The order of the Channels page (live channels always first).
     public var channelSort: ChannelSort
+    /// Twitch & Kick: ad blocking and live chat.
+    public var streaming: StreamingSettings
     /// Video grid column count when the window is taller than wide (ignored on tvOS).
     public var gridColumnsPortrait: Int
     /// Video grid column count when the window is wider than tall (ignored on tvOS).
@@ -323,9 +323,9 @@ public struct AppSettings: Codable {
         perDeviceRecommendationsEnabled = true
         themeName = .system
         accentColor = .system
-        liveColor = Self.defaultMarkColor
         watchedBarColor = Self.defaultMarkColor
         channelSort = .youTube
+        streaming = StreamingSettings()
         gridColumnsPortrait = 2
         gridColumnsLandscape = 3
         enabledSections = BrowseSection.defaultSections.map(\.type)
@@ -422,9 +422,9 @@ extension AppSettings {
         case perDeviceRecommendationsEnabled
         case themeName
         case accentColor
-        case liveColor
         case watchedBarColor
         case channelSort
+        case streaming
         case gridColumnsPortrait
         case gridColumnsLandscape
         case enabledSections
@@ -457,13 +457,13 @@ extension AppSettings {
         return .solid
     }
 
-    /// The live and watched-bar colors, each defaulted when missing.
-    private static func markColors(
-        _ container: KeyedDecodingContainer<CodingKeys>
-    )
-        -> (AccentColorChoice, AccentColorChoice)
+    private static func barAndSort(_ container: KeyedDecodingContainer<CodingKeys>) -> (AccentColorChoice, ChannelSort)
     {
-        (markColor(container, .liveColor), markColor(container, .watchedBarColor))
+        (markColor(container, .watchedBarColor), channelOrder(container))
+    }
+
+    private static func streamingSettings(_ container: KeyedDecodingContainer<CodingKeys>) -> StreamingSettings {
+        container.safeDecode(StreamingSettings.self, forKey: .streaming, default: StreamingSettings())
     }
 
     private static func channelOrder(_ container: KeyedDecodingContainer<CodingKeys>) -> ChannelSort {
@@ -525,7 +525,7 @@ extension AppSettings {
             Bool.self, forKey: .perDeviceRecommendationsEnabled, default: d.perDeviceRecommendationsEnabled)
         themeName = c.safeDecode(ThemeName.self, forKey: .themeName, default: d.themeName)
         accentColor = c.safeDecode(AccentColorChoice.self, forKey: .accentColor, default: d.accentColor)
-        ((liveColor, watchedBarColor), channelSort) = (Self.markColors(c), Self.channelOrder(c))
+        ((watchedBarColor, channelSort), streaming) = (Self.barAndSort(c), Self.streamingSettings(c))
         let columns = Self.availableGridColumnCounts
         gridColumnsPortrait = min(
             max(

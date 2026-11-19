@@ -136,7 +136,7 @@ extension PlaybackViewModel {
     }
 
     /// Twitch and Kick: a fresh HLS URL (Twitch's tokens expire within minutes), then direct
-    /// playback. None of YouTube's extras run: no PO token, SponsorBlock, DeArrow, related
+    /// playback (Twitch live with its ads kept off: `playTwitchLive`). None of YouTube's extras run: no PO token, SponsorBlock, DeArrow, related
     /// videos or watch-history reporting. A past broadcast resumes where it was left.
     func loadExternal(video incoming: Video) async {
         // A live id is live even when the video arrived bare (a deep link, a restored queue).
@@ -150,6 +150,13 @@ extension PlaybackViewModel {
         sponsorSegments = []
         let saved = video.isLive ? nil : await VideoStateStore.shared.state(for: video.id)?.position
         do {
+            if let target = ExternalID.parse(video.id), target.platform == .twitch, target.kind == .live,
+                settings.streaming.blockTwitchAds
+            {
+                playerLog.notice("[external] twitch live \(video.id), ads blocked")
+                try await playTwitchLive(video: video, target: target)
+                return
+            }
             let url = try await ExternalStreamResolver.playbackURL(for: video)
             guard !Task.isCancelled, currentVideo?.id == video.id else { return }
             playerLog.notice("[external] \(video.platform.rawValue) \(video.isLive ? "live" : "VOD") \(video.id)")

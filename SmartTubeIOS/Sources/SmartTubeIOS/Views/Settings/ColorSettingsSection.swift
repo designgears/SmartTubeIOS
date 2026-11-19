@@ -3,7 +3,7 @@ import SwiftUI
 
 // MARK: - Colors
 
-/// The colors of the marks drawn over videos: LIVE badges and the watched bar.
+/// The color of the watched bar drawn over videos (LIVE badges use each service's own color).
 struct ColorSettingsSection: View {
     @Environment(SettingsStore.self) private var store
 
@@ -13,16 +13,12 @@ struct ColorSettingsSection: View {
     var body: some View {
         @Bindable var store = store
         Section {
-            row("Live Badges", $store.settings.liveColor)
-                .accessibilityIdentifier(AccessibilityID.Settings.liveColorPicker)
             row("Watched Bar", $store.settings.watchedBarColor)
                 .accessibilityIdentifier(AccessibilityID.Settings.watchedBarColorPicker)
         } header: {
             Text("Colors")
         } footer: {
-            Text(
-                "Live Badges colors LIVE on videos, on channels that are live and in the player. Watched Bar "
-                    + "is the bar under a video showing how much you've seen.")
+            Text("Watched Bar is the bar under a video showing how much you've seen.")
         }
     }
 

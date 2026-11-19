@@ -37,14 +37,15 @@ public actor KickClient {
         return channel
     }
 
-    /// The channel's numeric id and its chat room, for live chat.
-    public func chatIDs(slug: String) async throws -> (channel: Int, chatroom: Int)? {
+    /// The channel's numeric id, its chat room and its owner's user id (community emotes),
+    /// for live chat.
+    public func chatIDs(slug: String) async throws -> KickChatIDs? {
         guard let data = try await get("/v2/channels/\(Self.escaped(slug))", allowNotFound: true),
             let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
             let channel = root["id"] as? Int,
             let chatroom = (root["chatroom"] as? [String: Any])?["id"] as? Int
         else { return nil }
-        return (channel, chatroom)
+        return KickChatIDs(channel: channel, chatroom: chatroom, user: root["user_id"] as? Int ?? 0)
     }
 
     /// The channel's live stream, nil when offline.
@@ -120,6 +121,13 @@ public actor KickClient {
     static func escaped(_ text: String) -> String {
         text.lowercased().addingPercentEncoding(withAllowedCharacters: .urlPathAllowed.subtracting(["/"])) ?? text
     }
+}
+
+/// A Kick channel's ids for live chat: the channel, its chat room, its owner (community emotes).
+public struct KickChatIDs: Equatable, Sendable {
+    public let channel: Int
+    public let chatroom: Int
+    public let user: Int
 }
 
 // MARK: - Parsing

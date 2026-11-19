@@ -143,7 +143,7 @@ extension PlaybackViewModel {
         // Stop and clear the current item immediately so the previous frame
         // is not visible while the next video is loading.
         player.pause()
-        player.replaceCurrentItem(with: nil)
+        clearItemAndAdWatch()
         isPlaying = false
         videoEnded = false
         wasPlayingBeforeSuspend = false
@@ -1113,7 +1113,7 @@ extension PlaybackViewModel {
                 playerLog.notice("Saved position \(Int(pos))s for stop")
             }
         }
-        player.pause()
+        pauseEndingAdWatch()
         // fix12: Do NOT call player.replaceCurrentItem(with: nil) — keep the AVPlayerItem
         // alive so load() can detect and reuse it if the same video is re-opened within
         // a short window. Saves the ~1.27s exhaustiveRetry race for hot same-video replays.

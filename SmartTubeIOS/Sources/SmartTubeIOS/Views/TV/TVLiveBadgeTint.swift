@@ -4,7 +4,7 @@ import UIKit
 // MARK: - The player's LIVE tag in the app's live color
 
 /// Recolors AVKit's own LIVE tags (beside the subtitle, and at the scrubber's live edge) from
-/// the system pink to `color` (Settings › Colors › Live, via `AppColor.live`). AVKit has no API for it: each tag is an
+/// the system pink to `color` (the stream's service LIVE color, `AppColor.live`). AVKit has no API for it: each tag is an
 /// `AVUnifiedPlayerPlaybackStyleBadgeView` over a visual-effect view whose fill is a plain
 /// background color. AVKit re-sets that color as the tag changes state, so each fill is
 /// watched and recolored again — but only while it's the live pink (a tag showing something
@@ -15,7 +15,7 @@ final class TVLiveBadgeTint {
     /// Fills already given `color`, to repaint when the setting changes.
     private let tinted = NSHashTable<UIView>.weakObjects()
 
-    var color = UIColor(AppColor.live(nil)) {
+    var color = UIColor(AppColor.live()) {
         didSet {
             guard color != oldValue else { return }
             for fill in tinted.allObjects where fill.backgroundColor == oldValue {

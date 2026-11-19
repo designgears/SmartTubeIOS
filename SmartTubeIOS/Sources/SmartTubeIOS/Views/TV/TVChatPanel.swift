@@ -36,7 +36,7 @@ struct TVChatPanel: View {
                     .foregroundStyle(.secondary)
             }
             ForEach(feed.messages.suffix(Self.shown)) { message in
-                Text("\(Text(message.author).bold().foregroundColor(Self.color(message.color)))  \(message.text)")
+                Text("\(Text(message.author).bold().foregroundColor(Self.color(message.color)))  \(Self.body(message))")
                     .foregroundStyle(.white)
                     .font(.callout)
                     .lineLimit(3)
@@ -48,6 +48,22 @@ struct TVChatPanel: View {
         .frame(width: Self.width)
         .fixedSize(horizontal: false, vertical: true)
     }
+
+    /// The message's text and emote pictures (an emote's name until its picture is loaded).
+    static func body(_ message: ChatMessage) -> Text {
+        message.parts.reduce(Text("")) { text, part in
+            switch part {
+            case .text(let words):
+                return Text("\(text)\(words)")
+            case .emote(let name, let url):
+                guard let image = EmoteImages.shared.image(for: url) else { return Text("\(text)\(name)") }
+                // Centered on the line rather than sitting on the baseline.
+                return Text("\(text)\(Text(Image(uiImage: image)).baselineOffset(emoteBaselineOffset))")
+            }
+        }
+    }
+
+    static let emoteBaselineOffset: CGFloat = -10
 
     /// The author's "#RRGGBB", or a readable default.
     static func color(_ hex: String?) -> Color {

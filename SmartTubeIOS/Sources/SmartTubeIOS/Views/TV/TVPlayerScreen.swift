@@ -33,7 +33,8 @@ struct TVPlayerScreen: View {
                 TVNativePlayer(
                     vm: vm, state: menuState(vm), actions: actions(vm), fallbackVideo: video,
                     fillsScreen: store.settings.videoGravityMode == .fill,
-                    segments: vm.sponsorSegments, duration: vm.duration, liveColor: AppColor.live(store),
+                    segments: vm.sponsorSegments, duration: vm.duration,
+                    liveColor: AppColor.live((vm.currentVideo ?? video).platform),
                     isLive: vm.isLive,
                     transportBar: transportBar
                 )
@@ -46,6 +47,13 @@ struct TVPlayerScreen: View {
                         .ignoresSafeArea()
                         .transition(.move(edge: .trailing))
                 }
+                if let adBreak = vm.twitchAdBreak {
+                    TVTwitchAdNotice(adBreak: adBreak)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        .padding(.leading, 80)
+                        .padding(.top, 60)
+                        .transition(.opacity)
+                }
             }
         }
         .onAppear(perform: start)
@@ -55,7 +63,13 @@ struct TVPlayerScreen: View {
         }
         // The chat follows the stream on screen (Next can move to another one).
         .onChange(of: ChatKey(video: vm?.currentVideo ?? video, shown: showsChat), initial: false) { _, key in
-            if key.shown, LiveChatFeed.isAvailable(for: key.video) { chat.start(video: key.video) } else { chat.stop() }
+            if key.shown, LiveChatFeed.isAvailable(for: key.video) {
+                chat.start(
+                    video: key.video, emotes: store.settings.streaming.chatEmotes,
+                    communityEmotes: store.settings.streaming.thirdPartyEmotes)
+            } else {
+                chat.stop()
+            }
         }
         // Account switch: stop now, while the previous account is live, so its progress
         // and watch time are saved to it; then close.

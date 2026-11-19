@@ -88,7 +88,8 @@ struct TVStreamingChannelGrid: View {
                     title: channel.title,
                     thumbnailURL: channel.thumbnailURL,
                     subtitle: channel.subscriberCount,
-                    isLive: liveIds.contains(channel.id) || ExternalLiveStore.shared.liveVideo(of: channel.id) != nil
+                    isLive: liveIds.contains(channel.id) || ExternalLiveStore.shared.liveVideo(of: channel.id) != nil,
+                    platform: channel.platform
                 ) {
                     navigator.open(.channel(id: channel.id, title: channel.title))
                 }

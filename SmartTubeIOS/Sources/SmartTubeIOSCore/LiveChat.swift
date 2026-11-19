@@ -15,13 +15,22 @@ public struct ChatMessage: Identifiable, Hashable, Sendable {
     public let author: String
     /// "#RRGGBB" when the author picked a color.
     public let color: String?
+    /// The message as plain text (emotes by name).
     public let text: String
+    /// The message with its emotes as pictures (`ChatPart.emote`).
+    public var parts: [ChatPart]
+    /// Twitch: the channel's numeric id (`room-id`), for its community emotes.
+    let roomId: String?
 
-    public init(id: String, author: String, color: String?, text: String) {
+    public init(
+        id: String, author: String, color: String?, text: String, parts: [ChatPart]? = nil, roomId: String? = nil
+    ) {
         self.id = id
         self.author = author
         self.color = color
         self.text = text
+        self.parts = parts ?? [.text(text)]
+        self.roomId = roomId
     }
 }
 
@@ -40,6 +49,12 @@ public final class LiveChatFeed {
     public private(set) var isConnected = false
     @ObservationIgnored private var task: Task<Void, Never>?
     @ObservationIgnored private var videoId: String?
+    /// Emotes as pictures (Settings › Twitch & Kick › Chat Emotes).
+    @ObservationIgnored private var showsEmotes = true
+    /// 7TV, BetterTTV and FFZ too, once loaded for the channel.
+    @ObservationIgnored private var usesCommunityEmotes = true
+    @ObservationIgnored private var catalog = EmoteCatalog()
+    @ObservationIgnored private var catalogTask: Task<Void, Never>?
 
     public init() {}
 
@@ -48,11 +63,17 @@ public final class LiveChatFeed {
         ExternalID.parse(video.id)?.kind == .live
     }
 
-    public func start(video: Video) {
+    public func start(video: Video, emotes: Bool = true, communityEmotes: Bool = true) {
         guard Self.isAvailable(for: video), let target = ExternalID.parse(video.id) else { return }
         guard videoId != video.id || task == nil else { return }
         stop()
         videoId = video.id
+        (showsEmotes, usesCommunityEmotes) = (emotes, emotes && communityEmotes)
+        // Kick's community emotes are keyed by the channel's user id; Twitch's come with the
+        // first message (its room id).
+        if usesCommunityEmotes, target.platform == .kick {
+            loadCatalog { try? await KickClient.shared.chatIDs(slug: target.key).map { (.kick, String($0.user)) } }
+        }
         task = Task { [weak self] in
             while !Task.isCancelled {
                 let stream =
@@ -74,14 +95,39 @@ public final class LiveChatFeed {
     public func stop() {
         task?.cancel()
         task = nil
+        catalogTask?.cancel()
+        catalogTask = nil
+        catalog = EmoteCatalog()
         videoId = nil
         isConnected = false
         messages = []
     }
 
-    func append(_ message: ChatMessage) {
+    func append(_ incoming: ChatMessage) {
+        var message = incoming
+        if !showsEmotes {
+            message.parts = [.text(message.text)]
+        } else if usesCommunityEmotes {
+            message.parts = catalog.apply(message.parts)
+            if catalogTask == nil, let room = message.roomId { loadCatalog { (.twitch, room) } }
+        }
         messages.append(message)
         if messages.count > Self.capacity { messages.removeFirst(messages.count - Self.capacity) }
+    }
+
+    /// Loads the channel's community emotes once, then redraws the messages already shown.
+    private func loadCatalog(channel: @escaping @Sendable () async -> (StreamPlatform, String)?) {
+        catalogTask = Task { [weak self] in
+            guard let (platform, userId) = await channel() else { return }
+            let catalog = await EmoteCatalog.load(platform: platform, userId: userId)
+            guard let self, !Task.isCancelled, !catalog.isEmpty else { return }
+            self.catalog = catalog
+            self.messages = self.messages.map { message in
+                var message = message
+                message.parts = catalog.apply(message.parts)
+                return message
+            }
+        }
     }
 }
 
@@ -231,7 +277,8 @@ enum LiveChatParsing {
         let author = tags["display-name"].flatMap { $0.isEmpty ? nil : $0 } ?? nick ?? "?"
         return ChatMessage(
             id: tags["id"] ?? UUID().uuidString, author: author,
-            color: tags["color"].flatMap { $0.isEmpty ? nil : $0 }, text: text)
+            color: tags["color"].flatMap { $0.isEmpty ? nil : $0 }, text: text,
+            parts: NativeEmotes.twitchParts(text, emotesTag: tags["emotes"]), roomId: tags["room-id"])
     }
 
     /// A Centrifugo frame: `{"push":{"pub":{"data":{"event":"App\\Events\\ChatMessageEvent","data":"<json>"}}}}`.
@@ -249,7 +296,7 @@ enum LiveChatParsing {
             id: message["id"] as? String ?? UUID().uuidString,
             author: sender?["username"] as? String ?? "?",
             color: (sender?["identity"] as? [String: Any])?["color"] as? String,
-            text: kickEmotes(content))
+            text: kickEmotes(content), parts: NativeEmotes.kickParts(content))
     }
 
     /// `[emote:5748001:KEKW]` -> `KEKW`.

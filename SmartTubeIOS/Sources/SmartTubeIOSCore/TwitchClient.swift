@@ -87,13 +87,18 @@ public actor TwitchClient {
     // MARK: Playback
 
     /// A fresh HLS master URL for a live stream or past broadcast (its token expires within
-    /// minutes, so ask right before playing).
-    public func playbackURL(for target: ExternalID.Parsed) async throws -> URL {
+    /// minutes, so ask right before playing). `playerType` decides Twitch's ads (`TwitchAds`).
+    public func playbackURL(
+        for target: ExternalID.Parsed, playerType: String = TwitchAds.sitePlayerType
+    )
+        async throws -> URL
+    {
         let isVod = target.kind == .vod
         let body: [String: Any] = [
             "query": Self.playbackTokenQuery,
             "variables": [
                 "login": isVod ? "" : target.key, "isLive": !isVod, "vodID": isVod ? target.key : "", "isVod": isVod,
+                "playerType": playerType,
             ],
         ]
         let data = try await gql(body: body)
@@ -101,6 +106,22 @@ public actor TwitchClient {
             throw ExternalStreamError.unavailable("Twitch didn't give a playback token.")
         }
         return Self.usherURL(for: target, token: token)
+    }
+
+    /// The multivariant playlist itself, with its URL: one usher session, so whoever reads its
+    /// variants (the player, and the ad watcher) reads the same session.
+    public func playbackPlaylist(
+        for target: ExternalID.Parsed, playerType: String
+    ) async throws -> (
+        url: URL, text: String
+    ) {
+        let url = try await playbackURL(for: target, playerType: playerType)
+        let (data, response) = try await session.data(from: url)
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        guard (200..<300).contains(status), let text = String(bytes: data, encoding: .utf8) else {
+            throw ExternalStreamError.http(status)
+        }
+        return (url, text)
     }
 
     // MARK: Requests
@@ -137,11 +158,12 @@ extension TwitchClient {
         owner { login displayName }
         """
     static let playbackTokenQuery = """
-        query PlaybackAccessToken($login: String!, $isLive: Boolean!, $vodID: ID!, $isVod: Boolean!) { \
+        query PlaybackAccessToken($login: String!, $isLive: Boolean!, $vodID: ID!, $isVod: Boolean!, \
+        $playerType: String!) { \
         streamPlaybackAccessToken(channelName: $login, params: { platform: "web", playerBackend: "mediaplayer", \
-        playerType: "site" }) @include(if: $isLive) { value signature } \
+        playerType: $playerType }) @include(if: $isLive) { value signature } \
         videoPlaybackAccessToken(id: $vodID, params: { platform: "web", playerBackend: "mediaplayer", \
-        playerType: "site" }) @include(if: $isVod) { value signature } }
+        playerType: $playerType }) @include(if: $isVod) { value signature } }
         """
 
     static func usersQuery(_ logins: [String]) -> String {

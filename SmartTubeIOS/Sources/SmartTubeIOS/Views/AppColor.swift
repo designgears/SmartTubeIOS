@@ -3,13 +3,24 @@ import SwiftUI
 
 // MARK: - App colors
 
-/// The colors picked in Settings › Colors. Views outside the settings environment (and any
-/// `.system` choice) get `AppSettings.defaultMarkColor`.
+/// The app's mark colors: the services' LIVE colors, and the watched bar picked in Settings ›
+/// Colors (views outside the settings environment, and any `.system` choice, get
+/// `AppSettings.defaultMarkColor`).
 @MainActor
 enum AppColor {
-    /// LIVE badges, rings and tags — the app's own and the player's (see `TVLiveBadgeTint`).
-    static func live(_ store: SettingsStore?) -> Color {
-        mark(store?.settings.liveColor)
+    /// LIVE badges, rings and tags — the app's own and the player's (see `TVLiveBadgeTint`) — in
+    /// the service's own LIVE color: YouTube's red, Twitch's red, Kick's green.
+    static func live(_ platform: StreamPlatform = .youtube) -> Color {
+        switch platform {
+        case .youtube: Color(red: 0xFF / 255, green: 0, blue: 0)
+        case .twitch: Color(red: 0xEB / 255, green: 0x04 / 255, blue: 0)
+        case .kick: Color(red: 0x53 / 255, green: 0xFC / 255, blue: 0x18 / 255)
+        }
+    }
+
+    /// Text on a `live` badge: Kick's green is light.
+    static func onLive(_ platform: StreamPlatform = .youtube) -> Color {
+        platform == .kick ? .black : .white
     }
 
     /// The bar on a card showing how much has been watched.

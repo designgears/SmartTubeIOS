@@ -296,6 +296,12 @@ public final class PlaybackViewModel {
     /// True while the video is being routed to an external display via AirPlay.
     public internal(set) var isAirPlaying: Bool = false
     @ObservationIgnored nonisolated(unsafe) var airPlayObserver: NSKeyValueObservation?
+    /// A Twitch ad break being kept off the screen (Settings › Twitch & Kick), nil otherwise.
+    public internal(set) var twitchAdBreak: TwitchAdBreak?
+    /// Watches the playing Twitch stream for ad breaks (PlaybackViewModel+TwitchAds.swift).
+    @ObservationIgnored var twitchAdTask: Task<Void, Never>?
+    /// Serves the Twitch playlist the app fetched, so the player reads the session the watcher reads.
+    @ObservationIgnored var twitchPlaylistLoader: TwitchPlaylistLoader?
     /// Counts exhaustive retry cycles (0 = no retry yet). Set by exhaustiveRetry(video:originalError:).
     var retryAttempts: Int = 0
     /// The stream type that produced the current AVPlayerItem, set by each successful load path.

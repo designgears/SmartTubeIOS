@@ -74,7 +74,9 @@ struct TVVideoThumbnail: View {
                 }
                 HStack {
                     if video.isLive {
-                        TVBadge(text: "LIVE", background: AppColor.live(store))
+                        TVBadge(
+                            text: "LIVE", background: AppColor.live(video.platform),
+                            foreground: AppColor.onLive(video.platform))
                     } else if video.isUpcoming {
                         TVBadge(text: "UPCOMING", background: .black.opacity(0.75))
                     }
@@ -107,11 +109,12 @@ struct TVPlatformBadge: View {
 struct TVBadge: View {
     let text: String
     let background: Color
+    var foreground: Color = .white
 
     var body: some View {
         Text(text)
             .font(.caption2.weight(.bold).monospacedDigit())
-            .foregroundStyle(.white)
+            .foregroundStyle(foreground)
             .padding(.horizontal, 10)
             .padding(.vertical, 4)
             .background(background, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
@@ -236,6 +239,8 @@ struct TVChannelCard: View {
     var subtitle: String?
     /// Streaming right now: a ring and a LIVE tag on the avatar, as YouTube marks it.
     var isLive = false
+    /// Whose LIVE color the ring and tag take.
+    var platform: StreamPlatform = .youtube
     let action: () -> Void
     @Environment(SettingsStore.self) private var store: SettingsStore?
 
@@ -252,10 +257,15 @@ struct TVChannelCard: View {
                 .frame(width: TVLayout.channelSize, height: TVLayout.channelSize)
                 .clipShape(Circle())
                 .overlay {
-                    if isLive { Circle().strokeBorder(AppColor.live(store), lineWidth: 6) }
+                    if isLive { Circle().strokeBorder(AppColor.live(platform), lineWidth: 6) }
                 }
                 .overlay(alignment: .bottom) {
-                    if isLive { TVBadge(text: "LIVE", background: AppColor.live(store)).offset(y: 12) }
+                    if isLive {
+                        TVBadge(
+                            text: "LIVE", background: AppColor.live(platform), foreground: AppColor.onLive(platform)
+                        )
+                        .offset(y: 12)
+                    }
                 }
                 .modifier(TVAvatarFocus())
                 VStack(spacing: 4) {
