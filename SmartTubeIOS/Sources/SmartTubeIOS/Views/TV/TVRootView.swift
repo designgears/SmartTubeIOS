@@ -79,7 +79,7 @@ private struct TVSidebarTabs: View {
                 TVTabStack(tab: .search) { TVSearchView() }
             }
             Tab(
-                auth.isSignedIn ? (auth.accountName ?? "Accounts") : (auth.savedAccounts.isEmpty ? "Sign In" : "Guest"),
+                auth.whoIsWatchingTitle,
                 systemImage: AppSymbol.channel,
                 value: TVTab.accounts
             ) {

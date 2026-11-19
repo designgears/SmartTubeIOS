@@ -56,6 +56,11 @@ struct WatchedStoreFile: Sendable {
         }
     }
 
+    /// Deletes one profile's file.
+    func remove(slot: String) {
+        try? FileManager.default.removeItem(at: url(for: slot))
+    }
+
     private func url(for slot: String) -> URL {
         let safe = slot.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? slot
         return directory.appendingPathComponent("\(safe).json")

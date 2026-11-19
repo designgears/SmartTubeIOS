@@ -163,6 +163,12 @@ public final class WatchedStore {
         file.remove(accountId: accountId, keeping: slot)
     }
 
+    /// A removed profile's data (see `AccountScope.forget(slots:)`); never the live one.
+    public func forget(slot: String) {
+        guard slot != self.slot else { return }
+        file.remove(slot: slot)
+    }
+
     // MARK: Storage
 
     /// Writes now rather than after `writeDelay` (account switch, tests).

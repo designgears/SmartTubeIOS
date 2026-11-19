@@ -11,7 +11,7 @@ struct AccountSettingsSection: View {
 
     var body: some View {
         Section("Account") {
-            if auth.savedAccounts.isEmpty {
+            if auth.savedAccounts.isEmpty && auth.profileStore.profiles.isEmpty {
                 Button("Sign in with Google") { showSignIn = true }
                     .accessibilityIdentifier(AccessibilityID.Settings.signInButton)
             } else {
@@ -24,7 +24,8 @@ struct AccountSettingsSection: View {
                             avatarURL: profile.avatarURL, size: .large)
                     } else {
                         SettingsProfileLabel(
-                            name: "Guest", caption: Self.profileCount(auth.profiles.count), symbol: AppSymbol.person,
+                            name: "Guest", caption: Self.profileCount(auth.profileStore.profiles.count),
+                            symbol: AppSymbol.person,
                             size: .large)
                     }
                 }
@@ -34,10 +35,7 @@ struct AccountSettingsSection: View {
         .sheet(isPresented: $showSignIn) { SignInView() }
     }
 
-    private var currentProfile: AccountProfile? {
-        guard let id = auth.activeProfileId else { return nil }
-        return auth.profiles.first { $0.id == id }
-    }
+    private var currentProfile: AppProfile? { auth.profileStore.active }
 
     static func profileCount(_ count: Int) -> String {
         count == 1 ? "1 profile on this device" : "\(count) profiles on this device"
@@ -46,8 +44,8 @@ struct AccountSettingsSection: View {
 
 // MARK: - Accounts page
 
-/// Settings › Accounts: every profile (each channel of each signed-in Google account) and
-/// Guest — tap to switch — then adding and signing out of Google accounts.
+/// Settings › Accounts: every profile and Guest — tap to switch — then editing profiles, and
+/// adding and signing out of Google accounts.
 struct AccountsSettingsView: View {
     @Environment(AuthService.self) private var auth
     @State private var showAddAccount = false
@@ -56,9 +54,9 @@ struct AccountsSettingsView: View {
     var body: some View {
         Form {
             Section {
-                ForEach(auth.profiles) { profile in
+                ForEach(auth.profileStore.profiles) { profile in
                     Button {
-                        auth.switchProfile(profile)
+                        auth.switchToProfile(profile)
                     } label: {
                         SettingsProfileLabel(
                             name: profile.name, caption: profile.handle, avatarURL: profile.avatarURL,
@@ -75,12 +73,21 @@ struct AccountsSettingsView: View {
             } header: {
                 Text("Profiles")
             } footer: {
-                Text("Each profile keeps its own feed, history, queue and settings.")
+                Text("Each profile keeps its own accounts, feed, history, queue and settings.")
+            }
+
+            Section {
+                NavigationLink {
+                    ProfilesSettingsView()
+                } label: {
+                    Label("Edit Profiles", systemImage: AppSymbol.edit)
+                }
+                .accessibilityIdentifier(AccessibilityID.Settings.editProfilesLink)
             }
 
             #if os(tvOS)
             // Who's Watching? is the tvOS profile picker; iOS has none.
-            if auth.profiles.count > 1 {
+            if auth.profileStore.profiles.count > 1 {
                 Section {
                     NavigationLink {
                         WhosWatchingSettingsView()
@@ -106,7 +113,9 @@ struct AccountsSettingsView: View {
             } header: {
                 Text("Google Accounts")
             } footer: {
-                Text("Signing out of an account removes all of its channels from this device.")
+                Text(
+                    "Signing out of an account removes it from every profile; profiles made for its channels "
+                        + "go with it.")
             }
         }
         .settingsPage(
@@ -142,8 +151,8 @@ struct AccountsSettingsView: View {
 
     /// "All" or "2 of 3".
     private var whosWatchingSummary: String {
-        let all = auth.profiles.count
-        let shown = auth.profiles.filter { !auth.hiddenProfileIds.contains($0.id) }.count
+        let all = auth.profileStore.profiles.count
+        let shown = auth.profileStore.profiles.filter { !auth.hiddenProfileIds.contains($0.id) }.count
         return shown == all ? "All" : "\(shown) of \(all)"
     }
 
@@ -212,5 +221,48 @@ struct SettingsProfileLabel: View {
         }
         .frame(width: size.points, height: size.points)
         .clipShape(Circle())
+    }
+}
+
+// MARK: - Profiles page
+
+/// Settings › Accounts › Edit Profiles: open a profile to edit it, or add one.
+struct ProfilesSettingsView: View {
+    @Environment(AuthService.self) private var auth
+    @State private var isNamingProfile = false
+    @State private var newProfileName = ""
+
+    var body: some View {
+        Form {
+            Section {
+                ForEach(auth.profileStore.profiles) { profile in
+                    NavigationLink {
+                        ProfileEditorView(profileId: profile.id)
+                    } label: {
+                        SettingsProfileLabel(
+                            name: profile.name, caption: profile.handle, avatarURL: profile.avatarURL,
+                            isCurrent: profile.id == auth.activeProfileId)
+                    }
+                }
+                Button("Add Profile", systemImage: AppSymbol.plus) {
+                    newProfileName = ""
+                    isNamingProfile = true
+                }
+            } footer: {
+                Text("A profile is a person: their YouTube accounts, history and settings.")
+            }
+        }
+        .settingsPage(
+            symbol: AppSymbol.accountsFill, caption: "Rename profiles, choose their accounts, or delete them."
+        )
+        .navigationTitle("Profiles")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+        .alert("New Profile", isPresented: $isNamingProfile) {
+            TextField("Name", text: $newProfileName)
+            Button("Create") { auth.createProfile(named: newProfileName) }
+            Button("Cancel", role: .cancel) {}
+        }
     }
 }

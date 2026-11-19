@@ -40,10 +40,10 @@ extension AuthService {
         persistHiddenProfiles()
     }
 
-    /// A signed-out account's profiles no longer need a hidden flag.
-    func forgetHiddenProfiles(of accountId: String) {
+    /// Removed profiles no longer need a hidden flag.
+    func forgetHiddenProfiles(_ ids: [String]) {
         let before = hiddenProfileIds
-        hiddenProfileIds = hiddenProfileIds.filter { AccountProfile.accountId(ofSlot: $0) != accountId }
+        hiddenProfileIds.subtract(ids)
         if hiddenProfileIds != before { persistHiddenProfiles() }
     }
 
@@ -51,17 +51,19 @@ extension AuthService {
         UserDefaults.standard.set(hiddenProfileIds.sorted(), forKey: Self.hiddenProfilesKey)
     }
 
-    /// The active profile's id (AccountScope slot), nil for Guest.
-    public var activeProfileId: String? {
-        guard isSignedIn, let activeAccountId else { return nil }
-        return AccountProfile.slot(accountId: activeAccountId, pageId: activePageId)
-    }
+    /// The profile in use (its id is the AccountScope slot), nil for Guest.
+    public var activeProfileId: String? { profileStore.activeId }
 
-    /// Switches to a profile: another account (on the given channel), or another channel of
-    /// the active account. Either way it's a full switch — own data, fresh YouTube session.
+    public var profileStore: ProfileStore { ProfileStore.shared }
+
+    /// Switches to a YouTube channel's profile (Settings' account list): the profile it's main
+    /// in, else a full switch to the channel (which then gets a profile of its own).
     public func switchProfile(_ profile: AccountProfile) {
         guard profile.id != activeProfileId else { return }
-        if isSignedIn, profile.accountId == activeAccountId {
+        let key = YouTubeAccountKey(accountId: profile.accountId, pageId: profile.pageId)
+        if let appProfile = profileStore.profile(id: profile.id) ?? profileStore.profile(for: key) {
+            switchToProfile(appProfile)
+        } else if isSignedIn, profile.accountId == activeAccountId {
             let channel =
                 channels.first { $0.pageId == profile.pageId }
                 ?? YouTubeChannel(name: profile.name, avatarURL: profile.avatarURL, pageId: profile.pageId)
@@ -145,9 +147,18 @@ extension AuthService {
     public var isGuest: Bool { !isSignedIn }
 
     public func switchToGuest() {
-        guard isSignedIn else { return }
+        guard isSignedIn || activeProfileId != nil else { return }
         beginAccountChange()
-        rememberActiveAccount()
+        endYouTubeSession()
+        profileStore.activate(nil)
+        syncAccountScope()
+        authLog.notice("switchToGuest() — \(self.savedAccounts.count) account(s) kept")
+    }
+
+    /// Ends the live YouTube session without signing anyone out (Guest, or a profile without
+    /// YouTube): the account stays saved, one switch away.
+    func endYouTubeSession() {
+        if isSignedIn { rememberActiveAccount() }
         clearSession()
         clearAccountCookies()
         activeAccountId = nil
@@ -156,8 +167,6 @@ extension AuthService {
         Task { await tokenManager.clearToken() }
         ActiveChannel.shared.set(pageId: nil)
         persistSavedAccounts()
-        syncAccountScope()
-        authLog.notice("switchToGuest() — \(self.savedAccounts.count) account(s) kept")
     }
 
     /// Signs one account out of this device (switching to another if it was active).
@@ -168,8 +177,9 @@ extension AuthService {
         }
         savedAccounts.removeAll { $0.id == id }
         persistSavedAccounts()
-        AccountScope.forget(id)
-        forgetHiddenProfiles(of: id)
+        let removed = profileStore.removeYouTubeAccount(id)
+        forgetHiddenProfiles(removed)
+        AccountScope.forget(slots: removed)
     }
 
     // MARK: UI testing
@@ -204,6 +214,7 @@ extension AuthService {
         } else {
             activeAccountId = nil
             isSignedIn = false
+            profileStore.activate(nil)
         }
         authLog.notice("[uitesting] local test profiles seeded — active=\(activeId)")
         syncAccountScope()
@@ -249,17 +260,23 @@ extension AuthService {
         activeAccountId = entry.id
         accountToRestoreOnCancel = nil
         persistSavedAccounts()
+        // The temporary entry's place in profiles goes to the original; its own profile goes.
+        let removed = droppedId.map { profileStore.removeYouTubeAccount($0, replacement: entry.id) } ?? []
+        forgetHiddenProfiles(removed)
         syncAccountScope()
         // After the switch above has parked the temporary entry's data, delete it.
-        if let droppedId { Task { @MainActor in AccountScope.forget(droppedId) } }
+        if !removed.isEmpty { Task { @MainActor in AccountScope.forget(slots: removed) } }
     }
 
-    /// Makes the active account's on-device data (history, positions, queue, settings…)
-    /// live — see `AccountScope`. Signed out uses its own "guest" data.
+    /// Brings the profiles in line with the signed-in channels and the live session, and makes
+    /// the profile in use's on-device data (history, positions, queue, settings…) live — see
+    /// `ProfileStore.sync` and `AccountScope`. Guest uses its own "guest" data.
     func syncAccountScope() {
         // While adding an account the previous one stays live until the new one signs in.
         if activeAccountId == nil, accountToRestoreOnCancel != nil { return }
-        // Each channel of an account is its own profile (primary = the bare account id).
+        let live = isSignedIn ? activeAccountId.map { YouTubeAccountKey(accountId: $0, pageId: activePageId) } : nil
+        // Mid profile switch the live session is still the old profile's; it isn't followed.
+        profileStore.sync(channels: profiles, live: isSwitchingProfile ? nil : live)
         let slot = activeProfileId
         Task { @MainActor in await AccountScope.activate(slot) }
     }

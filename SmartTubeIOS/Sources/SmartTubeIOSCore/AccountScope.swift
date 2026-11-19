@@ -101,6 +101,19 @@ public enum AccountScope {
         }
     }
 
+    /// Deletes removed profiles' parked data (exact slots; never the live one).
+    @MainActor
+    public static func forget(slots: [String], defaults: UserDefaults = .standard) {
+        let live = defaults.string(forKey: currentSlotKey)
+        let suffixes = Set(slots.filter { $0 != live }.map { "#account.\($0)" })
+        guard !suffixes.isEmpty else { return }
+        for slot in slots where slot != live { WatchedStore.shared.forget(slot: slot) }
+        for key in defaults.dictionaryRepresentation().keys {
+            guard let hash = key.range(of: "#account.", options: .backwards) else { continue }
+            if suffixes.contains(String(key[hash.lowerBound...])) { defaults.removeObject(forKey: key) }
+        }
+    }
+
     static func hasSavedData(_ slot: String, defaults: UserDefaults) -> Bool {
         let suffix = "#account.\(slot)"
         return defaults.dictionaryRepresentation().keys.contains { $0.hasSuffix(suffix) }

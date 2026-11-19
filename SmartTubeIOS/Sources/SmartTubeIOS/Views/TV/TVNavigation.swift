@@ -28,6 +28,7 @@ enum TVRoute: Hashable {
     case channel(id: String, title: String)
     case playlist(id: String, title: String)
     case streamingSearch(StreamPlatform)
+    case profile(id: String)
 }
 
 // MARK: - TVPlayRequest
@@ -120,6 +121,8 @@ struct TVTabStack<Content: View>: View {
                             TVStreamingSearchView(platform: platform)
                         case .playlist(let id, let title):
                             TVPlaylistView(playlistId: id, title: title)
+                        case .profile(let id):
+                            ProfileEditorView(profileId: id)
                         }
                     }
             }

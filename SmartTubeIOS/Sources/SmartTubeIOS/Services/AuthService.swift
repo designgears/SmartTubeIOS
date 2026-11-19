@@ -78,6 +78,8 @@ public final class AuthService {
     static let hiddenProfilesKey = "accounts.hiddenProfiles"
     /// While adding another account: the account to go back to if the user cancels.
     var accountToRestoreOnCancel: String?
+    /// True during `switchToProfile`: the live YouTube session is still the outgoing profile's.
+    var isSwitchingProfile = false
     /// Bumped on every account change. Async auth work (token refresh, user info, cookies,
     /// device-code exchange) captures it and drops its result if the account changed meanwhile,
     /// so a late response for the previous account is never applied to the new one.
@@ -203,6 +205,7 @@ public final class AuthService {
     /// Cancel an in-progress activation.
     public func cancelSignIn() {
         accountGeneration += 1  // a token exchange still in flight must not apply
+        profileStore.addAccountTarget = nil
         pollTask?.cancel()
         pollTask = nil
         pendingActivation = nil
@@ -259,15 +262,31 @@ public final class AuthService {
 
     public func signOut() {
         beginAccountChange()
-        // Multi-account: signing out of one account switches to the next remaining one.
         let leaving = activeAccountId
-        if let leaving { forgetHiddenProfiles(of: leaving) }
+        // Profiles made for the account's channels go with it (and their on-device data, once
+        // it is parked); people's profiles just lose the account.
+        let removed = leaving.map { profileStore.removeYouTubeAccount($0) } ?? []
+        forgetHiddenProfiles(removed)
+        defer { if !removed.isEmpty { Task { @MainActor in AccountScope.forget(slots: removed) } } }
+        // The profile in use stays when it has more than this account: on its next YouTube
+        // account, or without YouTube.
+        if let profile = profileStore.active {
+            clearSession()
+            savedAccounts.removeAll { $0.id == leaving }
+            if let next = profile.mainYouTube, savedAccounts.contains(where: { $0.id == next.accountId }) {
+                activeAccountId = nil
+                switchAccount(to: next.accountId, pageId: .some(next.pageId))
+            } else {
+                endYouTubeSession()
+                syncAccountScope()
+            }
+            return
+        }
+        // Multi-account: signing out of one account switches to the next remaining one.
         if let next = savedAccounts.first(where: { $0.id != leaving }) {
             savedAccounts.removeAll { $0.id == leaving }
             activeAccountId = nil
             switchAccount(to: next.id)
-            // The signed-out account's on-device data goes with it (once it is parked).
-            if let leaving { Task { @MainActor in AccountScope.forget(leaving) } }
             return
         }
         savedAccounts = []
@@ -293,7 +312,6 @@ public final class AuthService {
         clearKeychain()
         clearAccountCookies()
         syncAccountScope()  // back to the signed-out ("guest") data
-        if let leaving { Task { @MainActor in AccountScope.forget(leaving) } }
     }
 
     /// Clears the in-memory auth session without touching the keychain.

@@ -3,16 +3,15 @@ import SwiftUI
 
 // MARK: - WhosWatchingSettingsView
 
-/// Settings › Who's Watching: choose which profiles (channels of the signed-in accounts)
-/// appear on the Who's Watching? screen. Hiding one keeps it signed in; it stays
-/// reachable from the Account section of Settings.
+/// Settings › Who's Watching: choose which profiles appear on the Who's Watching? screen.
+/// Hiding one keeps it (and its accounts); it stays reachable from Settings › Accounts.
 struct WhosWatchingSettingsView: View {
     @Environment(AuthService.self) private var auth
 
     var body: some View {
         List {
             Section {
-                ForEach(auth.profiles) { profile in
+                ForEach(auth.profileStore.profiles) { profile in
                     Toggle(isOn: shownBinding(profile)) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(profile.name)
@@ -27,7 +26,7 @@ struct WhosWatchingSettingsView: View {
                 Text("Show on Who's Watching")
             } footer: {
                 Text(
-                    "Hidden profiles stay signed in and can still be switched to from Settings. "
+                    "Hidden profiles keep their accounts and can still be switched to from Settings. "
                         + "The profile in use is always shown.")
             }
         }
@@ -38,7 +37,7 @@ struct WhosWatchingSettingsView: View {
         #endif
     }
 
-    private func shownBinding(_ profile: AccountProfile) -> Binding<Bool> {
+    private func shownBinding(_ profile: AppProfile) -> Binding<Bool> {
         Binding(
             get: { !auth.hiddenProfileIds.contains(profile.id) },
             set: { auth.setProfile(profile, hidden: !$0) }
@@ -46,7 +45,7 @@ struct WhosWatchingSettingsView: View {
     }
 
     /// Handle, plus "In use" — two channels can share a name and photo.
-    private func caption(for profile: AccountProfile) -> String? {
+    private func caption(for profile: AppProfile) -> String? {
         let parts = [profile.id == auth.activeProfileId ? "In use" : nil, profile.handle].compactMap { $0 }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }

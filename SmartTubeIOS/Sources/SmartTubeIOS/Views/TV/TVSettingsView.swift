@@ -12,13 +12,13 @@ struct TVSettingsView: View {
     var body: some View {
         TVSettingsLayout {
             if auth.isSignedIn {
-                TVSettingsArtwork(symbol: AppSymbol.channel, imageURL: auth.accountAvatarURL)
+                TVSettingsArtwork(symbol: AppSymbol.channel, imageURL: auth.profileStore.active?.avatarURL)
             } else {
                 TVSettingsArtwork(symbol: AppSymbol.settings)
             }
         } caption: {
             VStack(spacing: 12) {
-                Text(auth.isSignedIn ? auth.accountName ?? "YouTube Account" : "SmartTube")
+                Text(auth.profileStore.active?.name ?? "SmartTube")
                     .font(.title2.weight(.bold))
                     .multilineTextAlignment(.center)
                 Text(appVersion).font(.headline).foregroundStyle(.secondary)

@@ -4,9 +4,18 @@ enum AccessibilityID {
         static let sortMenu = "channels.sortMenu"
     }
 
+    enum Profiles {
+        static let addProfileCard = "profiles.addProfileCard"
+        static let addYouTubeButton = "profiles.addYouTubeButton"
+        static let deleteButton = "profiles.deleteButton"
+        static let renameButton = "profiles.renameButton"
+        static let switchButton = "profiles.switchButton"
+    }
+
     enum Settings {
         static let accentColorPicker = "settings.accentColorPicker"
         static let accountsLink = "settings.accountsLink"
+        static let editProfilesLink = "settings.editProfilesLink"
         static let addAccountButton = "settings.addAccountButton"
         static let changePINButton = "settings.changePINButton"
         static let watchedBarColorPicker = "settings.watchedBarColorPicker"
