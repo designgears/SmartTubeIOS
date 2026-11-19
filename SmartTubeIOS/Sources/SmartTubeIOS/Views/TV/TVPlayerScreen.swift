@@ -22,6 +22,9 @@ struct TVPlayerScreen: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var vm: PlaybackViewModel?
     @State private var transportBar = TVPlayerPresentationState()
+    /// Twitch and Kick live chat, shown beside the video from the transport bar's Chat.
+    @State private var chat = LiveChatFeed()
+    @State private var showsChat = false
 
     var body: some View {
         ZStack {
@@ -38,10 +41,23 @@ struct TVPlayerScreen: View {
                 TVPlayerOverlays(vm: vm, video: video, isVideoOnScreen: transportBar.isVideoOnScreen) {
                     navigator.nowPlaying = nil
                 }
+                if showsChat {
+                    TVChatPanel(feed: chat)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                        .ignoresSafeArea()
+                        .transition(.move(edge: .trailing))
+                }
             }
         }
         .onAppear(perform: start)
-        .onDisappear { vm?.stop() }
+        .onDisappear {
+            vm?.stop()
+            chat.stop()
+        }
+        // The chat follows the stream on screen (Next can move to another one).
+        .onChange(of: ChatKey(video: vm?.currentVideo ?? video, shown: showsChat), initial: false) { _, key in
+            if key.shown, LiveChatFeed.isAvailable(for: key.video) { chat.start(video: key.video) } else { chat.stop() }
+        }
         // Account switch: stop now, while the previous account is live, so its progress
         // and watch time are saved to it; then close.
         .onReceive(NotificationCenter.default.publisher(for: AccountScope.willChangeNotification)) { _ in
@@ -88,7 +104,9 @@ struct TVPlayerScreen: View {
             skipLabel: vm.currentToastSegment.map { "Skip \($0.category.tvLabel)" },
             hasChannel: (vm.currentVideo ?? video).channelId != nil,
             subtitle: Self.subtitle(vm: vm, fallback: video),
-            platform: (vm.currentVideo ?? video).platform
+            platform: (vm.currentVideo ?? video).platform,
+            hasChat: LiveChatFeed.isAvailable(for: vm.currentVideo ?? video),
+            showsChat: showsChat
         )
     }
 
@@ -136,55 +154,10 @@ struct TVPlayerScreen: View {
             previous: { vm.playPrevious() },
             seek: { vm.seek(to: $0) },
             playVideo: { vm.load(video: $0) },
-            openChannel: { navigator.openChannel(of: vm.currentVideo ?? fallback) }
+            openChannel: { navigator.openChannel(of: vm.currentVideo ?? fallback) },
+            toggleChat: { withAnimation { showsChat.toggle() } }
         )
     }
-}
-
-// MARK: - Menu state / actions
-
-/// Value snapshot of everything the transport-bar menus show. Menus are rebuilt only when
-/// this changes (it deliberately excludes the playback clock).
-struct TVPlayerMenuState: Equatable {
-    struct CaptionOption: Equatable {
-        let id: String
-        let name: String
-    }
-    struct ChapterOption: Equatable {
-        let title: String
-        let start: TimeInterval
-    }
-
-    var formats: [VideoFormat]
-    var selectedFormatID: UUID?
-    var captions: [CaptionOption]
-    var selectedCaptionID: String?
-    var speed: Double
-    var isLiked: Bool
-    var isDisliked: Bool
-    var chapters: [ChapterOption]
-    var hasNext: Bool
-    var hasPrevious: Bool
-    var skipLabel: String?
-    var hasChannel: Bool
-    /// "Channel · 1.5M views · 9 hours ago" — the line under the title in the transport bar.
-    var subtitle: String
-    /// Twitch and Kick have no likes, and no YouTube formats to pick from.
-    var platform: StreamPlatform = .youtube
-}
-
-struct TVPlayerActions {
-    var selectFormat: (VideoFormat?) -> Void
-    var selectCaption: (String?) -> Void
-    var setSpeed: (Double) -> Void
-    var like: () -> Void
-    var dislike: () -> Void
-    var skipSegment: () -> Void
-    var next: () -> Void
-    var previous: () -> Void
-    var seek: (TimeInterval) -> Void
-    var playVideo: (Video) -> Void
-    var openChannel: () -> Void
 }
 
 // MARK: - AVPlayerViewController bridge
@@ -472,6 +445,13 @@ struct TVNativePlayer: UIViewControllerRepresentable {
         private func menus(for state: TVPlayerMenuState) -> [UIMenuElement] {
             var items: [UIMenuElement] = []
             let isYouTube = state.platform == .youtube
+            if state.hasChat {
+                items.append(
+                    UIAction(
+                        title: state.showsChat ? "Hide Chat" : "Chat", image: UIImage(systemName: AppSymbol.chat),
+                        state: state.showsChat ? .on : .off
+                    ) { [weak self] _ in self?.actions?.toggleChat() })
+            }
 
             if isYouTube {
                 items.append(
@@ -523,8 +503,14 @@ struct TVNativePlayer: UIViewControllerRepresentable {
                         }))
             }
 
+            if let more = moreMenu(for: state) { items.append(more) }
+            return items
+        }
+
+        /// Dislike, Previous / Next video and Go to Channel, when they apply.
+        private func moreMenu(for state: TVPlayerMenuState) -> UIMenu? {
             var more: [UIMenuElement] = []
-            if isYouTube {
+            if state.platform == .youtube {
                 more.append(
                     UIAction(
                         title: state.isDisliked ? "Disliked" : "Dislike",
@@ -549,10 +535,8 @@ struct TVNativePlayer: UIViewControllerRepresentable {
                         title: "Go to Channel", image: UIImage(systemName: AppSymbol.personSquare),
                         handler: { [weak self] _ in self?.actions?.openChannel() }))
             }
-            if !more.isEmpty {
-                items.append(UIMenu(title: "More", image: UIImage(systemName: AppSymbol.more), children: more))
-            }
-            return items
+            return more.isEmpty
+                ? nil : UIMenu(title: "More", image: UIImage(systemName: AppSymbol.more), children: more)
         }
 
         // MARK: Metadata (native Info panel)
